@@ -45,6 +45,7 @@ CREATE TABLE `v2_coupon` (
                              `limit_use_with_user` int(11) DEFAULT NULL,
                              `limit_plan_ids` varchar(255) DEFAULT NULL,
                              `limit_period` varchar(255) DEFAULT NULL,
+                             `bind_email` varchar(255) DEFAULT NULL,
                              `started_at` int(11) NOT NULL,
                              `ended_at` int(11) NOT NULL,
                              `created_at` int(11) NOT NULL,
