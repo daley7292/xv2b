@@ -108,6 +108,10 @@ CREATE TABLE `v2_coupon` (
   `updated_at` int(11) NOT NULL
 );
 
+ALTER TABLE `v2_coupon`
+ADD COLUMN bind_email VARCHAR(255) DEFAULT NULL
+AFTER limit_period;
+
 ALTER TABLE `v2_order`
 ADD `discount_amount` int(11) NULL AFTER `total_amount`;
 
