@@ -432,7 +432,7 @@ class UserController extends Controller
         $order->trade_no = Helper::guid();
         $order->total_amount = 0;
         $order->type = 5;
-        $order->status = 1;
+        $order->status = 0;
         $order->invite_user_id = $user->invite_user_id;
         $couponService = new CouponService($code);
         if (!$couponService->use($order)) {
@@ -449,8 +449,7 @@ class UserController extends Controller
             DB::rollBack();
             abort(500, __('绑定邀请关系失败'));
         }
-        OrderHandleJob::dispatchNow($order->trade_no);
-        app(OrderNotifyService::class)->notify($order);
+        $orderService->padi('redeem_code:'.$code)
         DB::commit();
         return response([
             'data' => [
