@@ -449,7 +449,7 @@ class UserController extends Controller
             DB::rollBack();
             abort(500, __('绑定邀请关系失败'));
         }
-        $orderService->padi('redeem_code:'.$code);
+        $orderService->paid('redeem_code:'.$code);
         DB::commit();
         return response([
             'data' => [
