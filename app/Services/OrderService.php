@@ -2,12 +2,13 @@
 
 namespace App\Services;
 
-use App\Jobs\OrderHandleJob;
 use App\Models\Order;
-use App\Models\Plan;
+use App\Models\Coupon;
 use App\Models\User;
+use App\Jobs\OrderHandleJob;
 use App\Services\OrderNotifyService;
-use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
+
 
 class OrderService
 {
@@ -253,20 +254,39 @@ class OrderService
     public function paid(string $callbackNo)
     {
         $order = $this->order;
+    
         if ($order->status !== 0) return true;
+    
         $order->status = 1;
         $order->paid_at = time();
         $order->callback_no = $callbackNo;
         if (!$order->save()) return false;
+        if ($order->coupon_id) {
+            $coupon = Coupon::find($order->coupon_id);
+            if ($coupon && !empty($coupon->bind_email)) {
+                $inviter = User::where('email', $coupon->bind_email)->first();
+                if ($inviter && $order->user_id) {
+                    User::where('id', $order->user_id)
+                        ->whereNull('invite_user_id')
+                        ->update(['invite_user_id' => $inviter->id]);
+                }
+            }
+        }
         try {
             OrderHandleJob::dispatch($order->trade_no);
             app(OrderNotifyService::class)->notify($order);
             $this->handleFirstOrderReward($order);
         } catch (\Exception $e) {
+            Log::error('订单支付处理异常', [
+                'order_id' => $order->id,
+                'error' => $e->getMessage()
+            ]);
             return false;
         }
+    
         return true;
     }
+    
 
     public function cancel():bool
     {
