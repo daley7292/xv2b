@@ -16,7 +16,6 @@ class Checkin extends Telegram
     public function handle($message, $match = [])
     {
         $telegramService = $this->telegramService;
-        \Log::info('Telegram message received:', (array) $message);
         if (isset($message->chat_id) && isset($message->message_id)) {
             $telegramService->scheduleDeleteMessage($message->chat_id, $message->message_id);
         }
