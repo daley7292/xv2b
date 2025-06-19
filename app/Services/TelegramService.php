@@ -21,7 +21,7 @@ class TelegramService {
     
         if (isset($response->result->message_id)) {
             DeleteTelegramMessage::dispatch($chatId, $response->result->message_id)
-                ->delay(now()->addSeconds(5));
+                ->delay(now()->addSeconds(15));
         }
     
         return $response;
@@ -45,7 +45,7 @@ class TelegramService {
         if ($parseMode === 'markdown') {
             $text = str_replace('_', '\_', $text);
         }
-        $this->request('sendMessage', [
+        return $this->request('sendMessage', [
             'chat_id' => $chatId,
             'text' => $text,
             'parse_mode' => $parseMode
@@ -55,14 +55,6 @@ class TelegramService {
     public function approveChatJoinRequest(int $chatId, int $userId)
     {
         $this->request('approveChatJoinRequest', [
-            'chat_id' => $chatId,
-            'user_id' => $userId
-        ]);
-    }
-
-    public function declineChatJoinRequest(int $chatId, int $userId)
-    {
-        $this->request('declineChatJoinRequest', [
             'chat_id' => $chatId,
             'user_id' => $userId
         ]);

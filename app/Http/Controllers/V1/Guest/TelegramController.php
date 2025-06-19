@@ -24,7 +24,6 @@ class TelegramController extends Controller
     public function webhook(Request $request)
     {
         $this->formatMessage($request->input());
-        $this->formatChatJoinRequest($request->input());
         $this->handle();
     }
 
@@ -103,34 +102,5 @@ class TelegramController extends Controller
         $obj->reply_text = $data['message']['reply_to_message']['text'];
     }
         $this->msg = $obj;
-    }
-
-    private function formatChatJoinRequest(array $data)
-    {
-        if (!isset($data['chat_join_request'])) return;
-        if (!isset($data['chat_join_request']['from']['id'])) return;
-        if (!isset($data['chat_join_request']['chat']['id'])) return;
-        $user = \App\Models\User::where('telegram_id', $data['chat_join_request']['from']['id'])
-            ->first();
-        if (!$user) {
-            $this->telegramService->declineChatJoinRequest(
-                $data['chat_join_request']['chat']['id'],
-                $data['chat_join_request']['from']['id']
-            );
-            return;
-        }
-        $userService = new \App\Services\UserService();
-        if (!$userService->isAvailable($user)) {
-            $this->telegramService->declineChatJoinRequest(
-                $data['chat_join_request']['chat']['id'],
-                $data['chat_join_request']['from']['id']
-            );
-            return;
-        }
-        $userService = new \App\Services\UserService();
-        $this->telegramService->approveChatJoinRequest(
-            $data['chat_join_request']['chat']['id'],
-            $data['chat_join_request']['from']['id']
-        );
     }
 }
