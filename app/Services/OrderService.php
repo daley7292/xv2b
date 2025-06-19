@@ -256,13 +256,7 @@ class OrderService
     public function paid(string $callbackNo)
     {
         $order = $this->order;
-    
         if ($order->status !== 0) return true;
-    
-        $order->status = 1;
-        $order->paid_at = time();
-        $order->callback_no = $callbackNo;
-        if (!$order->save()) return false;
         if ($order->coupon_id) {
             $coupon = Coupon::find($order->coupon_id);
             if ($coupon && !empty($coupon->bind_email)) {
@@ -271,9 +265,14 @@ class OrderService
                     User::where('id', $order->user_id)
                         ->whereNull('invite_user_id')
                         ->update(['invite_user_id' => $inviter->id]);
+                    $order->invite_user_id = $inviter->id;
                 }
             }
         }
+        $order->status = 1;
+        $order->paid_at = time();
+        $order->callback_no = $callbackNo;
+        if (!$order->save()) return false;
         try {
             OrderHandleJob::dispatch($order->trade_no);
             app(OrderNotifyService::class)->notify($order);
