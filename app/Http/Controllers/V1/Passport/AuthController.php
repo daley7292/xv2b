@@ -185,16 +185,6 @@ class AuthController extends Controller
         if ($code) {
             $redemptionCodeService = new RedemptionCodeService();
             $redeemData = $redemptionCodeService->validate($code);
-            if (!empty($redeemData['bind_email'])) {
-                $bindUser = User::where('email', $redeemData['bind_email'])->first();
-                if ($bindUser) {
-                    $user->invite_user_id = $bindUser->id;
-                        if (!$user->save()) {
-                        DB::rollBack();
-                        abort(500, __('Register failed'));
-                    }
-                }
-            }
             $plan = Plan::find($redeemData['plan_id']);
             if (!$plan) {
                 DB::rollBack();

@@ -424,20 +424,6 @@ class UserController extends Controller
             abort(500, __('This payment period cannot be purchased, please choose another cycle'));
         }
         DB::beginTransaction();
-        \Log::info('当前 redeemData:', ['redeemData' => $redeemData]);
-
-        if (!empty($redeemData['bind_email'])) {
-            \Log::info('检测到绑定邮箱', ['bind_email' => $redeemData['bind_email']]);
-            $bindUser = User::where('email', $redeemData['bind_email'])->first();
-            if ($bindUser) {
-                $user->invite_user_id = $bindUser->id;
-                \Log::info('成功绑定邀请人', ['invite_user_id' => $bindUser->id, 'user_id' => $user->id]);
-            } else {
-                \Log::info('绑定邮箱未找到用户', ['bind_email' => $redeemData['bind_email']]);
-            }
-        } else {
-            \Log::info('未检测到绑定邮箱');
-        }        
         $order = new Order();
         $orderService = new OrderService($order);
         $order->user_id = $user->id;
@@ -509,16 +495,6 @@ class UserController extends Controller
             Log::error('周期价格为空', ['period' => $redeemData['period']]);
             abort(500, __('This payment period cannot be purchased, please choose another cycle'));
         }
-            if (!empty($redeemData['bind_email'])) {
-                $bindUser = User::where('email', $redeemData['bind_email'])->first();
-                if ($bindUser) {
-                    $user->invite_user_id = $bindUser->id;
-                        if (!$user->save()) {
-                        DB::rollBack();
-                        abort(500, __('绑定邀请关系失败'));
-                    }
-                }
-            }
         $value = match ($redeemData['period']) {
             'month_price' => 30,
             'quarter_price' => 90,
