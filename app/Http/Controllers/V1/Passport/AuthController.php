@@ -221,7 +221,7 @@ class AuthController extends Controller
                 }
                 $order->coupon_id = $couponService->getId();
             }
-            if (!$orderService->paid('system')) {
+            if (!$orderService->paid('redeem_code:'.$code)) {
                 DB::rollback();
                 abort(500, __('Failed to update order amount'));
             }
