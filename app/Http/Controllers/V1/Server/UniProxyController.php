@@ -58,7 +58,6 @@ class UniProxyController extends Controller
     public function push(Request $request)
     {
         $data = $request->json()->all();
-        \Log::info('Received alive data:', ['data' => $data]);
         if (empty($data)) {
             $data = $_POST;
         }
@@ -113,6 +112,7 @@ class UniProxyController extends Controller
     public function alive(Request $request)
     {
         $data = $request->json()->all();
+        \Log::info('Received alive data:', ['data' => $data]);
         if (empty($data)) {
             $data = $_POST;
         }
