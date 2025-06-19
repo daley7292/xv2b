@@ -137,7 +137,6 @@ class AuthController extends Controller
         //注册IP
         $ip = $request->ip();
         $cacheKey = 'trial_ip_' . $ip;
-        \Log::info('用户注册请求信息:', ['ip' => $ip, 'email' => $email]);
         if ($inviteCode) {
             $inviteCode = InviteCode::where('code', $inviteCode)->where('status', 0)->first();
             if (!$inviteCode) {
