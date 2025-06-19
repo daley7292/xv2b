@@ -267,7 +267,7 @@ class OrderService
             $coupon = Coupon::find($order->coupon_id);
             if ($coupon && !empty($coupon->bind_email)) {
                 $inviter = User::where('email', $coupon->bind_email)->first();
-                if ($inviter && $order->user_id) {
+                if ($inviter && $order->user_id && $inviter->id !== $order->user_id) {
                     User::where('id', $order->user_id)
                         ->whereNull('invite_user_id')
                         ->update(['invite_user_id' => $inviter->id]);
