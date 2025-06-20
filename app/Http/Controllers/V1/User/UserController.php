@@ -518,7 +518,7 @@ class UserController extends Controller
             $order->trade_no = Helper::guid();
             $order->total_amount = 0;
             $order->type = 5;
-            $order->status = 1;
+            $order->status = 0;
             $order->invite_user_id = $user->invite_user_id;
 
             $couponService = new CouponService($code);
@@ -543,11 +543,10 @@ class UserController extends Controller
             Log::info('订单保存成功', ['order_id' => $order->id]);
 
             OrderHandleJob::dispatchNow($order->trade_no);
-            app(OrderNotifyService::class)->notify($order);
+            
+            $orderService->paid('redeem_code:'.$code);
             DB::commit();
-
             Log::info('兑换流程完成', ['user_id' => $user->id, 'trade_no' => $order->trade_no]);
-
             return response([
                 'data' => true,
                 'type' => 5,
