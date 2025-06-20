@@ -30,10 +30,6 @@ class UnBind extends Telegram {
             abort(500, '用户不存在');
         }
 
-        if ($user->telegram_id !== $message->chat_id) {
-            abort(500, '该订阅链接未绑定到当前Telegram账号');
-        }
-
         $user->telegram_id = null;
         if (!$user->save()) {
             abort(500, '解绑失败');
