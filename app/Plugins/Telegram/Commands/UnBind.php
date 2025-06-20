@@ -7,20 +7,38 @@ use App\Plugins\Telegram\Telegram;
 
 class UnBind extends Telegram {
     public $command = '/unbind';
-    public $description = '将Telegram账号从网站解绑';
+    public $description = '通过订阅链接解绑 Telegram，例如：/unbind 订阅地址';
 
     public function handle($message, $match = []) {
         if (!$message->is_private) return;
-        $user = User::where('telegram_id', $message->chat_id)->first();
-        $telegramService = $this->telegramService;
-        if (!$user) {
-            $telegramService->sendMessage($message->chat_id, '没有查询到您的用户信息，请先绑定账号', 'markdown');
-            return;
+
+        if (!isset($message->args[0])) {
+            abort(500, '参数有误，请携带订阅地址发送');
         }
-        $user->telegram_id = NULL;
+
+        $subscribeUrl = $message->args[0];
+        $subscribeUrl = parse_url($subscribeUrl);
+        parse_str($subscribeUrl['query'], $query);
+        $token = $query['token'] ?? null;
+
+        if (!$token) {
+            abort(500, '订阅地址无效');
+        }
+
+        $user = User::where('token', $token)->first();
+        if (!$user) {
+            abort(500, '用户不存在');
+        }
+
+        if ($user->telegram_id !== $message->chat_id) {
+            abort(500, '该订阅链接未绑定到当前Telegram账号');
+        }
+
+        $user->telegram_id = null;
         if (!$user->save()) {
             abort(500, '解绑失败');
         }
-        $telegramService->sendMessage($message->chat_id, '解绑成功', 'markdown');
+
+        $this->telegramService->sendMessage($message->chat_id, '解绑成功', 'markdown');
     }
 }
