@@ -20,11 +20,12 @@ class ClientController extends Controller
             ?? ($_SERVER['HTTP_USER_AGENT'] ?? '');
         $flag = strtolower($flag);
         $user = $request->user;
-        // account not expired and is not banned.
         $userService = new UserService();
         if ($userService->isAvailable($user)) {
             $serverService = new ServerService();
             $servers = $serverService->getAvailableServers($user);
+            $servers = $this->filterServers($servers, $request);
+            $servers = array_values($servers);
             if($flag) {
                 if (!strpos($flag, 'sing')) {
                     $this->setSubscribeInfoToServers($servers, $user);
@@ -56,24 +57,95 @@ class ClientController extends Controller
 
     private function setSubscribeInfoToServers(&$servers, $user)
     {
-        if (!isset($servers[0])) return;
-        if (!(int)config('v2board.show_info_to_server_enable', 0)) return;
+        if (!isset($servers[0]))
+            return;
+        if (!(int) config('v2board.show_info_to_server_enable', 0))
+            return;
+        $userid=$user['id'];
+        $url = config('v2board.app_url');
         $useTraffic = $user['u'] + $user['d'];
         $totalTraffic = $user['transfer_enable'];
         $remainingTraffic = Helper::trafficConvert($totalTraffic - $useTraffic);
         $expiredDate = $user['expired_at'] ? date('Y-m-d', $user['expired_at']) : '长期有效';
         $userService = new UserService();
         $resetDay = $userService->getResetDay($user);
-        array_unshift($servers, array_merge($servers[0], [
-            'name' => "套餐到期：{$expiredDate}",
-        ]));
         if ($resetDay) {
             array_unshift($servers, array_merge($servers[0], [
-                'name' => "距离下次重置剩余：{$resetDay} 天",
+                'name' => "距离下次重置剩余:{$resetDay} 天",
             ]));
         }
         array_unshift($servers, array_merge($servers[0], [
-            'name' => "剩余流量：{$remainingTraffic}",
+            'name' => "到期:{$expiredDate};剩余:{$remainingTraffic}",
         ]));
+        array_unshift($servers, array_merge($servers[0], [
+            'name' => "{$userid};官网:{$url}",
+        ]));
+    }
+
+    private function filterServers(&$servers, Request $request)
+    {
+        // 获取输入
+        $include = $request->input('include');
+        $exclude = $request->input('exclude');
+
+        // 将输入字符串转换为数组
+        $includeArray = preg_split('/[,|]/', $include, -1, PREG_SPLIT_NO_EMPTY);
+        $excludeArray = preg_split('/[,|]/', $exclude, -1, PREG_SPLIT_NO_EMPTY);
+
+        // 过滤 servers 数组
+        $servers = array_filter($servers, function ($item) use ($includeArray, $excludeArray) {
+            // 检查是否包含任何 include 词
+            $includeMatch = empty($includeArray) || array_reduce($includeArray, function ($carry, $word) use ($item) {
+                return $carry || (stripos($item['name'], $word) !== false);
+            }, false);
+
+            // 检查是否不包含所有 exclude 词
+            $excludeMatch = empty($excludeArray) || array_reduce($excludeArray, function ($carry, $word) use ($item) {
+                return $carry && (stripos($item['name'], $word) === false);
+            }, true);
+
+            return $includeMatch && $excludeMatch;
+        });
+        return $servers;
+    }
+
+    public function getuuidSubscribe(Request $request)  {
+        $user = User::where([
+            'email' => $request->query('email'),
+            'uuid' => $request->query('uuid')
+        ])->first();
+    
+        if (!$user) {
+            return response()->json([
+                'message' => '用户不存在'
+            ], 404);
+        }
+        $user = User::where('id', $user->id)
+        ->select([
+            'plan_id',
+            'token',
+            'expired_at',
+            'u',
+            'd',
+            'transfer_enable',
+            'email',
+            'uuid'
+        ])
+        ->first();
+        if (!$user) {
+            abort(500, __('The user does not exist'));
+        }
+        if ($user->plan_id) {
+            $user['plan'] = Plan::find($user->plan_id);
+            if (!$user['plan']) {
+                abort(500, __('Subscription plan does not exist'));
+            }
+        }
+        $user['subscribe_url'] = Helper::getSubscribeUrl("/api/v1/client/subscribe?token={$user['token']}");
+        $userService = new UserService();
+        $user['reset_day'] = $userService->getResetDay($user);
+        return response([
+            'data' => $user
+        ]);
     }
 }
