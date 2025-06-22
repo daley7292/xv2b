@@ -33,7 +33,6 @@ class TelegramController extends Controller
         $msg = $this->msg;
         $commandName = explode('@', $msg->command);
 
-        // To reduce request, only commands contains @ will get the bot name
         if (count($commandName) == 2) {
             $botName = $this->getBotName();
             if ($commandName[1] === $botName){
@@ -95,8 +94,6 @@ class TelegramController extends Controller
                 'first_name' => $data['message']['from']['first_name'] ?? null,
             ];
         }
-
-    // 如果是回复消息
     if (isset($data['message']['reply_to_message']['text'])) {
         $obj->message_type = 'reply_message';
         $obj->reply_text = $data['message']['reply_to_message']['text'];
