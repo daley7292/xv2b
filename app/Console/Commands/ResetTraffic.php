@@ -30,34 +30,47 @@ class ResetTraffic extends Command
             DB::raw("GROUP_CONCAT(`id`) as plan_ids"),
             DB::raw("reset_traffic_method as method")
         )
-        ->groupBy('reset_traffic_method')
-        ->get()
-        ->toArray();
+            ->groupBy('reset_traffic_method')
+            ->get()
+            ->toArray();
 
         foreach ($resetMethods as $resetMethod) {
             $planIds = explode(',', $resetMethod['plan_ids']);
             $method = $resetMethod['method'];
-            $builder = with(clone($this->builder))->whereIn('plan_id', $planIds);
+            $builder = with(clone ($this->builder))->whereIn('plan_id', $planIds);
 
             if ($method === null) {
-                $method = (int)config('v2board.reset_traffic_method', 0);
+                $method = (int) config('v2board.reset_traffic_method', 0);
             }
 
-            switch ((int)$method) {
-                case 0:
+            switch ((int) $method) {
+                case 0: {
                     $this->resetByMonthFirstDay($builder);
                     break;
-                case 1:
+                }
+                case 1: {
                     $this->resetByExpireDay($builder);
                     break;
-                case 2:
+                }
+                case 2: {
                     break;
-                case 3:
+                }
+                case 3: {
                     $this->resetByYearFirstDay($builder);
                     break;
-                case 4:
+                }
+                case 4: {
                     $this->resetByExpireYear($builder);
                     break;
+                }
+                case 5: {
+                    $this->resetByQuarterCycle($builder);
+                    break;
+                }
+                case 6: {
+                    $this->resetByHalfYearCycle($builder);
+                    break;
+                }
             }
         }
     }
@@ -113,6 +126,52 @@ class ResetTraffic extends Command
         });
     }
 
+    private function resetByQuarterCycle($builder): void
+    {
+        $today = date('m-d');
+        $users = [];
+
+        foreach ($builder->get() as $user) {
+            $expiredMonth = (int) date('m', $user->expired_at);
+            $expiredDay = date('d', $user->expired_at);
+            for ($i = 0; $i < 4; $i++) {
+                $checkMonth = ($expiredMonth - $i * 3);
+                if ($checkMonth <= 0) {
+                    $checkMonth += 12;
+                }
+
+                if ((int) date('m') === $checkMonth && date('d') === $expiredDay) {
+                    $users[] = $user;
+                    break;
+                }
+            }
+        }
+
+        $this->resetUserTraffic($users);
+    }
+    private function resetByHalfYearCycle($builder): void
+    {
+        $today = date('m-d');
+        $users = [];
+
+        foreach ($builder->get() as $user) {
+            $expiredMonth = (int) date('m', $user->expired_at);
+            $expiredDay = date('d', $user->expired_at);
+            for ($i = 0; $i < 2; $i++) {
+                $checkMonth = ($expiredMonth - $i * 6);
+                if ($checkMonth <= 0) {
+                    $checkMonth += 12;
+                }
+                if ((int) date('m') === $checkMonth && date('d') === $expiredDay) {
+                    $users[] = $user;
+                    break;
+                }
+            }
+        }
+
+        $this->resetUserTraffic($users);
+    }
+
     private function resetUserTraffic($users)
     {
         foreach ($users as $user) {
@@ -141,10 +200,12 @@ class ResetTraffic extends Command
             } catch (\Exception $e) {
                 $attempts++;
 
-                if ($attempts >= $maxAttempts || (
-                    strpos($e->getMessage(), '40001') === false &&
-                    strpos(strtolower($e->getMessage()), 'deadlock') === false
-                )) {
+                if (
+                    $attempts >= $maxAttempts || (
+                        strpos($e->getMessage(), '40001') === false &&
+                        strpos(strtolower($e->getMessage()), 'deadlock') === false
+                    )
+                ) {
                     (new TelegramService())->sendMessageWithAdmin(
                         now()->format('Y/m/d H:i:s') . ' 用户流量重置失败：' . $e->getMessage()
                     );
