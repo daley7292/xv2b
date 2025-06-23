@@ -212,6 +212,7 @@ class OrderService
             ->where('period', '!=', 'reset_price')
             ->where('period', '!=', 'onetime_price')
             ->where('period', '!=', 'deposit')
+            ->where('period', '!=', '')
             ->where('status', 3)
             ->get()
             ->toArray();
