@@ -43,13 +43,14 @@ class PaymentService
         if ($this->config['notify_domain']) {
             $parseUrl = parse_url($notifyUrl);
             $notifyUrl = $this->config['notify_domain'] . $parseUrl['path'];
-    \Log::info('Scheme + Host', [
-    'scheme_host' => request()->getSchemeAndHttpHost(),
-    'host' => request()->getHost(),
-    'header_host' => request()->headers->get('host'),
-    'x_forwarded_host' => request()->headers->get('x-forwarded-host'),
-    'x_forwarded_proto' => request()->headers->get('x-forwarded-proto'),
-]);
+        }
+        \Log::info('Scheme + Host', [
+            'scheme_host' => request()->getSchemeAndHttpHost(),
+            'host' => request()->getHost(),
+            'header_host' => request()->headers->get('host'),
+            'x_forwarded_host' => request()->headers->get('x-forwarded-host'),
+            'x_forwarded_proto' => request()->headers->get('x-forwarded-proto'),
+        ]);
         return $this->payment->pay([
             'notify_url' => $notifyUrl,
             'return_url' => url('/#/order/' . $order['trade_no']),
