@@ -44,7 +44,7 @@ class PaymentService
             $parseUrl = parse_url($notifyUrl);
             $notifyUrl = $this->config['notify_domain'] . $parseUrl['path'];
         }
-
+        \Log::info('Current Host:', ['host' => request()->getSchemeAndHttpHost()]);
         return $this->payment->pay([
             'notify_url' => $notifyUrl,
             'return_url' => url('/#/order/' . $order['trade_no']),
