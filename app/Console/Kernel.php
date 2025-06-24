@@ -45,6 +45,7 @@ class Kernel extends ConsoleKernel
         $schedule->command('horizon:snapshot')->everyFiveMinutes();
         // user
         $schedule->command('user:update-alive-ip')->everyMinute();
+        $schedule->command('customFunction:GetStatPaymentMethodMoney')->dailyAt('0:00');
     }
 
     /**
