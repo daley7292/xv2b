@@ -159,9 +159,10 @@ class AuthController extends Controller
         if ($inviteCode) {
             $user->invite_user_id = $inviteCode->user_id ? $inviteCode->user_id : null;
         }
-        //试用
         $isQQEmail = Str::endsWith($email, ['@qq.com', '@qq.cn', '@qq.com.cn']);
-        if (Cache::has($cacheKey) && !$isQQEmail){
+        $emailPrefix = Str::before($email, '@');
+        $isNumericQQ = $isQQEmail && ctype_digit($emailPrefix);
+        if (Cache::has($cacheKey) && !$isNumericQQ) {
             \Log::info("试用注册 - IP {$ip} 在90天内已领取过试用，未发放试用套餐，用户邮箱：{$email}");
         }
         else{
