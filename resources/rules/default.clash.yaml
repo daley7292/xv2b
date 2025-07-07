@@ -46,6 +46,7 @@ rules:
  - DOMAIN-KEYWORD,astrill,🚀 节点选择
  - DOMAIN-KEYWORD,who,🚀 节点选择
  - DOMAIN-KEYWORD,vpn,🚀 节点选择
+ - DOMAIN-KEYWORD,9527,🚀 节点选择
  - DOMAIN-SUFFIX,gstatic.com,🚀 节点选择
  - DOMAIN-SUFFIX,services.googleapis.cn,🚀 节点选择
  - DOMAIN-SUFFIX,xn--ngstr-lra8j.com,🚀 节点选择
