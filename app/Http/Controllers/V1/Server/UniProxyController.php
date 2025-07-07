@@ -41,6 +41,7 @@ class UniProxyController extends Controller
     {
         ini_set('memory_limit', -1);
         Cache::put(CacheKey::get('SERVER_' . strtoupper($this->nodeType) . '_LAST_CHECK_AT', $this->nodeInfo->id), time(), 3600);
+        $cacheSeconds = (int) config('v2board.server_pull_interval', 60);
         $users = $this->serverService->getAvailableUsers($this->nodeInfo->group_id);
         $users = $users->toArray();
 
@@ -50,8 +51,7 @@ class UniProxyController extends Controller
         if (strpos($request->header('If-None-Match'), $eTag) !== false) {
             abort(304);
         }
-
-        return response($response)->header('ETag', "\"{$eTag}\"");
+        return response($response)->header('ETag', "\"{$eTag}\"")->header('Cache-Control', "public, max-age={$cacheSeconds}");
     }
 
     // 后端提交数据
