@@ -10,6 +10,8 @@ use App\Protocols\ClashMeta;
 use App\Services\ServerService;
 use App\Services\UserService;
 use App\Utils\Helper;
+use App\Models\SubscribeLog;
+use Illuminate\Support\Facades\Redis;
 use Illuminate\Http\Request;
 
 class ClientController extends Controller
@@ -20,13 +22,27 @@ class ClientController extends Controller
             ?? ($_SERVER['HTTP_USER_AGENT'] ?? '');
         $flag = strtolower($flag);
         $user = $request->user;
+
+        $ip = $request->getClientIp();
+        $location = $this->getLocationFromIp($ip);
+        
+        SubscribeLog::create([
+            'user_id' => $user->id,
+            'email' => $user->email,
+            'ip' => $ip,
+            'country' => $location['country'],
+            'city' => $location['city'],
+            'user_agent' => $request->userAgent(),
+            'created_at' => now()
+        ]);
+
         $userService = new UserService();
         if ($userService->isAvailable($user)) {
             $serverService = new ServerService();
             $servers = $serverService->getAvailableServers($user);
             $servers = $this->filterServers($servers, $request);
             $servers = array_values($servers);
-            if($flag) {
+            if ($flag) {
                 if (!strpos($flag, 'sing')) {
                     $this->setSubscribeInfoToServers($servers, $user);
                     foreach (array_reverse(glob(app_path('Protocols') . '/*.php')) as $file) {
@@ -61,7 +77,7 @@ class ClientController extends Controller
             return;
         if (!(int) config('v2board.show_info_to_server_enable', 0))
             return;
-        $userid=$user['id'];
+        $userid = $user['id'];
         $url = config('v2board.app_url');
         $useTraffic = $user['u'] + $user['d'];
         $totalTraffic = $user['transfer_enable'];
@@ -109,29 +125,30 @@ class ClientController extends Controller
         return $servers;
     }
 
-    public function getuuidSubscribe(Request $request)  {
+    public function getuuidSubscribe(Request $request)
+    {
         $user = User::where([
             'email' => $request->query('email'),
             'uuid' => $request->query('uuid')
         ])->first();
-    
+
         if (!$user) {
             return response()->json([
                 'message' => '用户不存在'
             ], 404);
         }
         $user = User::where('id', $user->id)
-        ->select([
-            'plan_id',
-            'token',
-            'expired_at',
-            'u',
-            'd',
-            'transfer_enable',
-            'email',
-            'uuid'
-        ])
-        ->first();
+            ->select([
+                'plan_id',
+                'token',
+                'expired_at',
+                'u',
+                'd',
+                'transfer_enable',
+                'email',
+                'uuid'
+            ])
+            ->first();
         if (!$user) {
             abort(500, __('The user does not exist'));
         }
@@ -147,5 +164,36 @@ class ClientController extends Controller
         return response([
             'data' => $user
         ]);
+    }
+    public static function getClientIp()
+    {
+        if (isset($_SERVER['HTTP_X_REAL_IP'])) {
+            return $_SERVER['HTTP_X_REAL_IP'];
+        } elseif (isset($_SERVER['HTTP_X_FORWARDED_FOR'])) {
+            return explode(',', $_SERVER['HTTP_X_FORWARDED_FOR'])[0];
+        }
+        return $_SERVER['REMOTE_ADDR'] ?? '0.0.0.0';
+    }
+    private function getLocationFromIp(string $ip): array
+    {
+        $cacheKey = "ip_location:{$ip}";
+        $cached = Redis::get($cacheKey);
+        if ($cached) {
+            return json_decode($cached, true);
+        }
+
+        $apiUrl = "http://ip-api.com/json/{$ip}?fields=520191&lang=zh-CN";
+        $response = @file_get_contents($apiUrl);
+        $data = json_decode($response, true);
+
+        if ($data && $data['status'] === 'success') {
+            $location = [
+                'country' => $data['country'] ?? null,
+                'city' => $data['city'] ?? null
+            ];
+            Redis::setex($cacheKey, 86400 * 30, json_encode($location));
+            return $location;
+        }
+        return ['country' => null, 'city' => null];
     }
 }
