@@ -18,6 +18,12 @@ class ClientController extends Controller
 {
     public function subscribe(Request $request)
     {
+        $subscribeUrls = explode(',', config('v2board.subscribe_url'));
+        $host = $request->getScheme() . '://' . $request->getHost();
+        if (!in_array($host, $subscribeUrls)) {
+            \Log::info('host=' . $host . ', subscribeUrls=' . implode(',', $subscribeUrls));
+            abort(404, 'Not Found');
+        }
         $flag = $request->input('flag')
             ?? ($_SERVER['HTTP_USER_AGENT'] ?? '');
         $flag = strtolower($flag);
