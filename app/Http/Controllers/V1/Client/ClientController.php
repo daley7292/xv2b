@@ -39,7 +39,7 @@ class ClientController extends Controller
         $blockedKeywords = [   "chrome/",   "edg/",   "edge/",   "safari/",   "mobile/",   "firefox/",   "opr/",   "opera/",   "msie",   "trident/",   "ucbrowser/",   "qqbrowser/",   "mqqbrowser/",   "baidubrowser/",   "miuibrowser/",   "huaweibrowser/",   "vivobrowser/",   "heytapbrowser/",   "qihu",   "fbav/",   "instagram",   "twitter",   "micromessenger/",   "alipayclient/",   "lbbrowser",   "quark",   "bot",   "mail",   "qq",   "wechat" ];
         foreach ($blockedKeywords as $keyword) {
             if (strpos($userAgent, $keyword) !== false) {
-                abort(400,'非法访问,订阅已重置');
+                abort(500,'非法访问,订阅已重置');
             }
         }
         $userService = new UserService();
