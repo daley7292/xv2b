@@ -263,7 +263,8 @@ class UserController extends Controller
                 'transfer_enable',
                 'device_limit',
                 'email',
-                'uuid'
+                'uuid',
+                'remarks'
             ])
             ->first();
         if (!$user) {
