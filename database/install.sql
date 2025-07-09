@@ -546,5 +546,17 @@ CREATE TABLE `v2_user` (
                            UNIQUE KEY `email` (`email`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
 
-
+CREATE TABLE `v2_subscribe_log` (
+  `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  `user_id` BIGINT UNSIGNED NOT NULL,
+  `email` VARCHAR(255) NOT NULL,
+  `ip` VARCHAR(45) DEFAULT NULL,
+  `country` VARCHAR(64) DEFAULT NULL,
+  `city` VARCHAR(64) DEFAULT NULL,
+  `user_agent` TEXT DEFAULT NULL,
+  `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `user_id_idx` (`user_id`),
+  KEY `email_idx` (`email`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8;
 -- 2023-07-17 07:38:59
