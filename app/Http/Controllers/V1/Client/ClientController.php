@@ -21,12 +21,18 @@ class ClientController extends Controller
         $xForwardedHost = request()->headers->get('x-forwarded-host');
         $xForwardedProto = request()->headers->get('x-forwarded-proto');
         $subscribeUrls = explode(',', config('v2board.subscribe_url'));
-        $host = $request->getScheme() . '://' . $request->getHost();
-        if ($xForwardedHost && $xForwardedProto) {
-            $host = $xForwardedProto . '://' . $xForwardedHost;
+
+        $host = $request->getHost();
+        if ($xForwardedHost) {
+            $host = $xForwardedHost;
         }
-        if (!in_array($host, $subscribeUrls)) {
-            \Log::info('host=' . $host . ', subscribeUrls=' . implode(',', $subscribeUrls));
+        $subscribeHosts = array_map(function ($url) {
+            $parsed = parse_url($url);
+            return $parsed['host'] ?? null;
+        }, $subscribeUrls);
+        \Log::info('host=' . $host . ', subscribeHosts=' . implode(',', $subscribeHosts));
+
+        if (!in_array($host, $subscribeHosts)) {
             abort(404, 'Not Found');
         }
         $flag = $request->input('flag')
