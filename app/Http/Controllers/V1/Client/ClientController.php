@@ -41,7 +41,7 @@ class ClientController extends Controller
 
         $ip = $request->getClientIp();
         $location = $this->getLocationFromIp($ip);
-        
+
         SubscribeLog::create([
             'user_id' => $user->id,
             'email' => $user->email,
@@ -52,14 +52,14 @@ class ClientController extends Controller
             'created_at' => now()
         ]);
         $userAgent = strtolower($request->userAgent() ?? '');
-        $blockedKeywords = [   "chrome/",   "edg/",   "edge/",   "safari/",   "mobile/",   "firefox/",   "opr/",   "opera/",   "msie",   "trident/",   "ucbrowser/",   "qqbrowser/",   "mqqbrowser/",   "baidubrowser/",   "miuibrowser/",   "huaweibrowser/",   "vivobrowser/",   "heytapbrowser/",   "qihu",   "fbav/",   "instagram",   "twitter",   "micromessenger/",   "alipayclient/",   "lbbrowser",   "quark",   "bot",   "mail",   "qq",   "wechat" ];
+        $blockedKeywords = ["chrome/", "edg/", "edge/", "safari/", "mobile/", "firefox/", "opr/", "opera/", "msie", "trident/", "ucbrowser/", "qqbrowser/", "mqqbrowser/", "baidubrowser/", "miuibrowser/", "huaweibrowser/", "vivobrowser/", "heytapbrowser/", "qihu", "fbav/", "instagram", "twitter", "micromessenger/", "alipayclient/", "lbbrowser", "quark", "bot", "mail", "qq", "wechat"];
         foreach ($blockedKeywords as $keyword) {
             if (strpos($userAgent, $keyword) !== false) {
                 \Log::warning("检测到非法访问关键字: {$keyword}, 用户ID: {$user->id}, UserAgent: {$userAgent}");
                 $user->token = Helper::guid();
                 $user->uuid = Helper::guid(true);
                 $user->save();
-                abort(403,'非法访问,已重置安全信息');
+                abort(403, '非法访问,已重置安全信息');
             }
         }
         $userService = new UserService();
@@ -223,30 +223,32 @@ class ClientController extends Controller
         }
         return ['country' => null, 'city' => null];
     }
-private function replaceServerHostByUaRule(array &$servers, string $userAgent)
-{
-    $uaRules = config('v2board.ua_rule');
-    $uaRuleLines = preg_split('/[\r\n;]+/', $uaRules, -1, PREG_SPLIT_NO_EMPTY);
-    $userAgent = strtolower($userAgent);
-    foreach ($uaRuleLines as $line) {
-        $parts = array_map('trim', explode(',', $line));
-        if (count($parts) !== 3) {
-            continue;
-        }
-        [$keyword, $oldHost, $newHost] = $parts;
+    private function replaceServerHostByUaRule(array &$servers, string $userAgent)
+    {
+        $uaRules = config('v2board.ua_rule', '');
+        $uaRules = str_replace(["\r", "\n"], '', $uaRules); // 移除换行符
+        $uaRuleLines = explode(';', $uaRules); // 分号分割
 
-        if (strpos($userAgent, strtolower($keyword)) !== false) {
-            \Log::info("UA规则命中：{$keyword}，替换服务器 host: {$oldHost} => {$newHost}");
+        $userAgent = strtolower($userAgent);
 
-            foreach ($servers as &$server) {
-                if (isset($server['host']) && $server['host'] === $oldHost) {
-                    $server['host'] = $newHost;
-                }
+        foreach ($uaRuleLines as $line) {
+            $parts = array_map('trim', explode(',', $line));
+            if (count($parts) !== 3) {
+                continue;
             }
-
-            // 匹配成功后立即结束
-            break;
+            [$keyword, $oldHost, $newHost] = $parts;
+            if (strpos($userAgent, strtolower($keyword)) !== false) {
+                \Log::info("UA规则命中：{$keyword}，将 host 中包含 {$oldHost} 替换为 {$newHost}");
+                foreach ($servers as &$server) {
+                    if (isset($server['host']) && stripos($server['host'], $oldHost) !== false) {
+                        $server['host'] = str_ireplace($oldHost, $newHost, $server['host']);
+                    }
+                    if (isset($server['server_name']) && stripos($server['server_name'], $oldHost) !== false) {
+                        $server['server_name'] = str_ireplace($oldHost, $newHost, $server['server_name']);
+                    }
+                }
+                break;
+            }
         }
     }
-}
 }
