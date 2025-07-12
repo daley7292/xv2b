@@ -223,7 +223,6 @@ class ClientController extends Controller
         }
         return ['country' => null, 'city' => null];
     }
-}
 private function replaceServerHostByUaRule(array &$servers, string $userAgent)
 {
     $uaRules = config('v2board.ua_rule');
@@ -249,4 +248,5 @@ private function replaceServerHostByUaRule(array &$servers, string $userAgent)
             break;
         }
     }
+}
 }
