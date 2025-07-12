@@ -31,7 +31,6 @@ class ClientController extends Controller
             return $parsed['host'] ?? null;
         }, $subscribeUrls);
         \Log::info('host=' . $host . ', subscribeHosts=' . implode(',', $subscribeHosts));
-
         if (!in_array($host, $subscribeHosts)) {
             abort(404, 'Not Found');
         }
@@ -68,6 +67,7 @@ class ClientController extends Controller
             $serverService = new ServerService();
             $servers = $serverService->getAvailableServers($user);
             $servers = $this->filterServers($servers, $request);
+            $this->replaceServerHostByUaRule($servers, $request->userAgent());
             $servers = array_values($servers);
             if ($flag) {
                 if (!strpos($flag, 'sing')) {
@@ -222,5 +222,31 @@ class ClientController extends Controller
             return $location;
         }
         return ['country' => null, 'city' => null];
+    }
+}
+private function replaceServerHostByUaRule(array &$servers, string $userAgent)
+{
+    $uaRules = config('v2board.ua_rule');
+    $uaRuleLines = preg_split('/[\r\n;]+/', $uaRules, -1, PREG_SPLIT_NO_EMPTY);
+    $userAgent = strtolower($userAgent);
+    foreach ($uaRuleLines as $line) {
+        $parts = array_map('trim', explode(',', $line));
+        if (count($parts) !== 3) {
+            continue;
+        }
+        [$keyword, $oldHost, $newHost] = $parts;
+
+        if (strpos($userAgent, strtolower($keyword)) !== false) {
+            \Log::info("UA规则命中：{$keyword}，替换服务器 host: {$oldHost} => {$newHost}");
+
+            foreach ($servers as &$server) {
+                if (isset($server['host']) && $server['host'] === $oldHost) {
+                    $server['host'] = $newHost;
+                }
+            }
+
+            // 匹配成功后立即结束
+            break;
+        }
     }
 }
