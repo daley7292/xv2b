@@ -30,7 +30,6 @@ class ClientController extends Controller
             $parsed = parse_url($url);
             return $parsed['host'] ?? null;
         }, $subscribeUrls);
-        \Log::info('host=' . $host . ', subscribeHosts=' . implode(',', $subscribeHosts));
         if (!in_array($host, $subscribeHosts)) {
             abort(404, 'Not Found');
         }
