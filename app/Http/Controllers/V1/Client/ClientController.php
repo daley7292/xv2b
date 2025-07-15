@@ -52,7 +52,7 @@ class ClientController extends Controller
             'created_at' => now()
         ]);
         $userAgent = strtolower($request->userAgent() ?? '');
-        $blockedKeywords = ["chrome/", "edg/", "edge/", "safari/", "mobile/", "firefox/", "opr/", "opera/", "msie", "trident/", "ucbrowser/", "qqbrowser/", "mqqbrowser/", "baidubrowser/", "miuibrowser/", "huaweibrowser/", "vivobrowser/", "heytapbrowser/", "qihu", "fbav/", "instagram", "twitter", "micromessenger/", "alipayclient/", "lbbrowser", "quark", "bot", "mail", "qq", "wechat"];
+        $blockedKeywords = ["bot", "mail", "qq", "wechat"];
         foreach ($blockedKeywords as $keyword) {
             if (strpos($userAgent, $keyword) !== false) {
                 \Log::warning("检测到非法访问关键字: {$keyword}, 用户ID: {$user->id}, UserAgent: {$userAgent}");
