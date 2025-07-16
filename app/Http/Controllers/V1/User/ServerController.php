@@ -23,13 +23,15 @@ class ServerController extends Controller
         }
         $filteredServers = collect($servers)->map(function ($server) {
             return [
-            'name' => $server['name'] ?? null,
-            'tags' => $server['tags'] ?? [],
-            'rate' => $server['rate'] ?? 1,
-            'sort' => $server['sort'] ?? 0,
-            'type' => $server['type'] ?? null,
-            'created_at' => $server['created_at'] ?? null,
-            'updated_at' => $server['updated_at'] ?? null,
+                'name' => $server['name'],
+                'tags' => $server['tags'],
+                'rate' => $server['rate'],
+                'sort' => $server['sort'],
+                'type' => $server['type'],
+                'created_at' => $server['created_at'],
+                'updated_at' => $server['updated_at'],
+                'last_check_at' => $server['last_check_at'],
+                'is_online' => $server['is_online'],
             ];
         })->toArray();
         $eTag = sha1(json_encode(array_column($filteredServers, 'cache_key')));
