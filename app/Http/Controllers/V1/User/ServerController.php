@@ -21,13 +21,23 @@ class ServerController extends Controller
             $serverService = new ServerService();
             $servers = $serverService->getAvailableServers($user);
         }
-        $eTag = sha1(json_encode(array_column($servers, 'cache_key')));
+        $filteredServers = collect($servers)->map(function ($server) {
+            return [
+            'name' => $server['name'] ?? null,
+            'tags' => $server['tags'] ?? [],
+            'rate' => $server['rate'] ?? 1,
+            'sort' => $server['sort'] ?? 0,
+            'type' => $server['type'] ?? null,
+            'created_at' => $server['created_at'] ?? null,
+            'updated_at' => $server['updated_at'] ?? null,
+            ];
+        })->toArray();
+        $eTag = sha1(json_encode(array_column($filteredServers, 'cache_key')));
         if (strpos($request->header('If-None-Match'), $eTag) !== false ) {
             abort(304);
         }
-
         return response([
-            'data' => $servers
+            'data' => $filteredServers
         ])->header('ETag', "\"{$eTag}\"");
     }
 }
