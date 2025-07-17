@@ -504,17 +504,6 @@ class OrderService
                 $order->type = 6;
                 $order->gift_days = $formatted_days;
                 $orderService->paid('firstorder');
-                \Log::info('注册首单购买奖励发放成功', [
-                    'user_id' => $user->id,
-                    'inviter_id' => $inviter->id,
-                    'order_id' => $order->id,
-                    'reward_monthly_value' => $rewardMonthlyValue,
-                    'inviter_monthly_value' => $inviterMonthlyValue,
-                    'price_ratio' => $priceRatio,
-                    'config_hours' => $configHours,
-                    'adjusted_hours' => $adjustedHours,
-                    'gift_days' => $formatted_days
-                ]);
             });
         } catch (\Exception $e) {
             \Log::error('处理首单购买奖励失败', [

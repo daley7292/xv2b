@@ -163,7 +163,6 @@ class AuthController extends Controller
         $emailPrefix = Str::before($email, '@');
         $isNumericQQ = $isQQEmail && ctype_digit($emailPrefix);
         if (Cache::has($cacheKey) && !$isNumericQQ) {
-            \Log::info("试用注册 - IP {$ip} 在90天内已领取过试用，未发放试用套餐，用户邮箱：{$email}");
         }
         else{
             if ((int)config('v2board.try_out_plan_id', 0)) {
