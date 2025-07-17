@@ -38,12 +38,9 @@ class TicketController extends Controller
         $model = Ticket::orderBy('updated_at', 'DESC');
         if ($request->input('status') !== NULL) {
             if ((int)$request->input('status') === -1) {
-                $model->where('status', 0)->where('reply_status', 1);
+                $model->where('status', 0)->where('reply_status', 0);
             } else {
                 $model->where('status',$request->input('status'));
-                if ($request->input('reply_status') !== null) {
-                    $model->whereIn('reply_status', (array) $request->input('reply_status'));
-                }
             }
         }
         if ($request->input('reply_status') !== NULL) {
