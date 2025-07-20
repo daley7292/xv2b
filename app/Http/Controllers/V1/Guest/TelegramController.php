@@ -216,10 +216,12 @@ class TelegramController extends Controller
         
         $botName = $this->getBotName();
         
+        $limit = self::UNBOUND_USER_HOURLY_LIMIT;
+        
         if ($remaining > 0) {
             // 还有剩余次数
             $text = "⚠️ 用户 <a href=\"tg://user?id={$userId}\">@{$username}</a> 您尚未绑定账户！\n\n";
-            $text .= "📊 本小时剩余发言次数：<b>{$remaining}/{self::UNBOUND_USER_HOURLY_LIMIT}</b>\n\n";
+            $text .= "📊 本小时剩余发言次数：<b>{$remaining}/{$limit}</b>\n\n";
             $text .= "🔗 请发送 /bind 订阅链接 到 @{$botName} 绑定\n";
             $text .= "⏰ 超出限制将被移出群组";
         } else {
