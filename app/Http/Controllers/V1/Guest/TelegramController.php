@@ -145,6 +145,9 @@ class TelegramController extends Controller
                         continue;
                     if ($msg->command !== $instance->command)
                         continue;
+                    if (isset($msg->command) && substr($msg->command, 0, 1) === '/') {
+                        $this->telegramService->deleteMessage($msg->chat_id, $msg->message_id, 15);
+                    }
                     $instance->handle($msg);
                     return;
                 }

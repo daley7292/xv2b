@@ -11,6 +11,8 @@ class Traffic extends Telegram {
     public $description = '查询流量信息';
 
     public function handle($message, $match = []) {
+        if (!$message->is_private)
+        return;
         $telegramService = $this->telegramService;
         $user = User::where('telegram_id', $message->chat_id)->first();
         if (!$user) {

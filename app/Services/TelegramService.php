@@ -16,13 +16,18 @@ class TelegramService
         $this->api = 'https://api.telegram.org/bot' . config('v2board.telegram_bot_token', $token) . '/';
     }
 
-    public function deleteMessage(int $chatId, int $messageId)
+    public function deleteMessage(int $chatId, int $messageId, int $delaySeconds = 0)
     {
-        $this->request('deleteMessage', [
-            'chat_id' => $chatId,
-            'message_id' => $messageId,
-        ]);
+        if ($delaySeconds > 0) {
+            DeleteTelegramMessage::dispatch($chatId, $messageId)->delay(now()->addSeconds($delaySeconds));
+        } else {
+            $this->request('deleteMessage', [
+                'chat_id' => $chatId,
+                'message_id' => $messageId,
+            ]);
+        }
     }
+    
 
     public function sendMessage(int $chatId, string $text, string $parseMode = '', array $extra = [], int $autoDeleteSeconds = 30)
     {
