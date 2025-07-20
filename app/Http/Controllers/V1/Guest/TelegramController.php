@@ -14,7 +14,7 @@ class TelegramController extends Controller
     protected $telegramService;
     
     // 未绑定用户发言限制相关常量
-    private const UNBOUND_USER_HOURLY_LIMIT = 3;
+    private const UNBOUND_USER_HOURLY_LIMIT = 10;
     private const CACHE_PREFIX = 'telegram_unbound_user_';
 
     public function __construct(Request $request)
@@ -220,14 +220,14 @@ class TelegramController extends Controller
         
         if ($remaining > 0) {
             // 还有剩余次数
-            $text = "⚠️ 用户 <a href=\"tg://user?id={$userId}\">@{$username}</a> 您尚未绑定账户！\n\n";
-            $text .= "📊 本小时剩余发言次数：<b>{$remaining}/{$limit}</b>\n\n";
-            $text .= "🔗 请发送 /bind 订阅链接 到 @{$botName} 绑定\n";
+            $text = "⚠️ 用户 <a href=\"tg://user?id={$userId}\">@{$username}</a> 您尚未绑定账户！\n";
+            $text .= "📊 本小时剩余发言次数：<b>{$remaining}/{$limit}</b>\n";
+            $text .= "🔗 请私聊 @{$botName} 发送 /bind 订阅链接 绑定\n";
             $text .= "⏰ 超出限制将被移出群组";
         } else {
             // 最后一次发言
-            $text = "🚨 用户 <a href=\"tg://user?id={$userId}\">@{$username}</a> 这是您本小时的最后一次发言机会！\n\n";
-            $text .= "🔗 请立即发送 /bind 订阅链接 到 @{$botName} 绑定\n";
+            $text = "🚨 用户 <a href=\"tg://user?id={$userId}\">@{$username}</a> 这是您本小时的最后一次发言机会！\n";
+            $text .= "🔗 请私聊 @{$botName} 发送 /bind 订阅链接 绑定\n";
             $text .= "⚠️ 下次发言将被移出群组！";
         }
         
@@ -235,7 +235,7 @@ class TelegramController extends Controller
         $extra = [
             'reply_to_message_id' => $msg->message_id
         ];
-        $this->telegramService->sendMessage($chatId, $text, 'HTML', $extra, 30);
+        $this->telegramService->sendMessage($chatId, $text, 'HTML', $extra, 60);
         
         \Log::info("[Telegram] 向用户 {$userId} 发送绑定提醒，剩余次数：{$remaining}");
     }
