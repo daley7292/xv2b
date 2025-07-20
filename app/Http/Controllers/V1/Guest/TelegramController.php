@@ -110,8 +110,8 @@ class TelegramController extends Controller
         $user = User::where('telegram_id', $msg->from->id ?? 0)
             ->where('banned', 0)
             ->first();
-        if (!$user) {
-            if (!$msg->is_private && isset($msg->chat_id, $msg->from->id)) {
+        if (!$user && !$msg->is_private) {
+            if (isset($msg->chat_id, $msg->from->id)) {
                 try {
                     $this->kickUser($msg->chat_id, $msg->from->id, 3600, true); // 1小时封禁并撤回消息
 
