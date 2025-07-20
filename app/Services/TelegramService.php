@@ -24,32 +24,27 @@ class TelegramService
         ]);
     }
 
-public function sendMessage(int $chatId, string $text, string $parseMode = '', array $extra = [], int $autoDeleteSeconds = 0)
-{
-    if ($parseMode === 'markdown') {
-        $text = str_replace('_', '\_', $text);
+    public function sendMessage(int $chatId, string $text, string $parseMode = '', array $extra = [], int $autoDeleteSeconds = 0)
+    {
+        if ($parseMode === 'markdown') {
+            $text = str_replace('_', '\_', $text);
+        }
+
+        $params = array_merge([
+            'chat_id' => $chatId,
+            'text' => $text,
+            'parse_mode' => $parseMode
+        ], $extra);
+
+        $response = $this->request('sendMessage', $params);
+
+        if ($autoDeleteSeconds > 0 && isset($response->result->message_id)) {
+            DeleteTelegramMessage::dispatch($chatId, $response->result->message_id)
+                ->delay(now()->addSeconds($autoDeleteSeconds));
+        }
+
+        return $response;
     }
-
-    $params = array_merge([
-        'chat_id' => $chatId,
-        'text' => $text,
-        'parse_mode' => $parseMode
-    ], $extra);
-
-    $response = $this->request('sendMessage', $params);
-
-    // 如果指定了自动删除时间，调度删除消息任务
-    if ($autoDeleteSeconds > 0 && isset($response->result->message_id)) {
-        DeleteTelegramMessage::dispatch($chatId, $response->result->message_id)
-            ->delay(now()->addSeconds($autoDeleteSeconds));
-    }
-
-    return $response;
-}
-
-
-
-
     public function banChatMember(int $chatId, int $userId, ?int $untilDate = null, bool $revokeMessages = false)
     {
         $params = [
@@ -97,6 +92,14 @@ public function sendMessage(int $chatId, string $text, string $parseMode = '', a
     {
         return $this->request('getMe');
     }
+
+    public function getChat(int $chatId)
+    {
+        return $this->request('getChat', [
+            'chat_id' => $chatId,
+        ]);
+    }
+
 
     public function setWebhook(string $url)
     {

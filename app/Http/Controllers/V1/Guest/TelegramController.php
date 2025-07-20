@@ -39,22 +39,41 @@ class TelegramController extends Controller
         }
 
         $msg = $this->msg;
+
         if (!$msg->is_channel_message) {
             return false;
         }
+
         if ($msg->is_private) {
             return false;
         }
+
         try {
             $this->telegramService->deleteMessage($msg->chat_id, $msg->message_id);
+
+            $isLinkedChannel = false;
+
             if ($msg->sender_chat_id) {
+                $chatInfo = $this->telegramService->getChat($msg->chat_id);
+                $linkedChatId = $chatInfo->result->linked_chat_id ?? null;
+                if ($linkedChatId && $linkedChatId == $msg->sender_chat_id) {
+                    $isLinkedChannel = true;
+                    \Log::info("[Telegram] 检测到关联频道发言，跳过封禁处理: {$msg->sender_chat_id}");
+                }
+            }
+
+            if (!$isLinkedChannel && $msg->sender_chat_id) {
                 $this->telegramService->banChatSenderChat($msg->chat_id, $msg->sender_chat_id);
             }
+
             $channelUsername = $msg->sender_chat_username ?? '未知频道';
-            $text = "⚠️ 检测到频道 @{$channelUsername} 身份发言，消息已删除且已封禁该频道发言权限。";
+            $text = "⚠️ 检测到频道 @{$channelUsername} 身份发言，消息已删除" .
+                ($isLinkedChannel ? '（关联频道，未封禁）' : '并已封禁该频道发言权限。');
+
             $this->telegramService->sendMessage($msg->chat_id, $text, 'HTML');
 
-            \Log::info("[Telegram] 删除并封禁频道身份消息: {$channelUsername}");
+            \Log::info("[Telegram] 删除频道身份消息: {$channelUsername}");
+
             return true;
 
         } catch (\Exception $e) {
@@ -62,6 +81,7 @@ class TelegramController extends Controller
             return false;
         }
     }
+
 
     protected function kickUser(int $chatId, int $userId, ?int $banSeconds = null, bool $revokeMessages = true)
     {
