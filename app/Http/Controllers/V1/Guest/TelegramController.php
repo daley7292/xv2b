@@ -26,8 +26,53 @@ class TelegramController extends Controller
     {
         \Log::info('[Telegram Webhook] Received message: ', $request->all());
         $this->formatMessage($request->input());
+        if ($this->checkAndKickChannelMessage()) {
+            return;
+        }
+
         $this->handle();
     }
+    private function checkAndKickChannelMessage()
+    {
+        if (!$this->msg) {
+            return false;
+        }
+
+        $msg = $this->msg;
+        if (!$msg->is_channel_message) {
+            return false;
+        }
+        if ($msg->is_private) {
+            return false;
+        }
+        try {
+            $this->telegramService->deleteMessage($msg->chat_id, $msg->message_id);
+            if ($msg->sender_chat_id) {
+                $this->telegramService->banChatSenderChat($msg->chat_id, $msg->sender_chat_id);
+            }
+            $channelUsername = $msg->sender_chat_username ?? '未知频道';
+            $text = "⚠️ 检测到频道 @{$channelUsername} 身份发言，消息已删除且已封禁该频道发言权限。";
+            $this->telegramService->sendMessage($msg->chat_id, $text, 'HTML');
+
+            \Log::info("[Telegram] 删除并封禁频道身份消息: {$channelUsername}");
+            return true;
+
+        } catch (\Exception $e) {
+            \Log::warning("[Telegram] 处理频道消息失败：" . $e->getMessage());
+            return false;
+        }
+    }
+
+    protected function kickUser(int $chatId, int $userId, ?int $banSeconds = null, bool $revokeMessages = true)
+    {
+        $untilDate = null;
+        if ($banSeconds !== null && $banSeconds > 0) {
+            $untilDate = time() + $banSeconds;
+        }
+
+        return $this->telegramService->banChatMember($chatId, $userId, $untilDate, $revokeMessages);
+    }
+
 
     public function handle()
     {
@@ -42,9 +87,8 @@ class TelegramController extends Controller
         if (!$user) {
             if (!$msg->is_private && isset($msg->chat_id, $msg->from->id)) {
                 try {
-                    $member = $this->telegramService->getChatMember($msg->chat_id, $msg->from->id);
-                    $status = $member->result->status ?? '';
-                    $this->telegramService->kickChatMember($msg->chat_id, $msg->from->id);
+                    $this->kickUser($msg->chat_id, $msg->from->id, 3600, true); // 1小时封禁并撤回消息
+
                     $username = $msg->from->username ?? '无用户名';
                     $text = "⚠️ 用户 <a href=\"tg://user?id={$msg->from->id}\">@{$username}</a> 未绑定账户，已被移出群组。";
                     $this->telegramService->sendMessage($msg->chat_id, $text, 'HTML');
@@ -56,6 +100,7 @@ class TelegramController extends Controller
 
             return;
         }
+
         if (count($commandName) == 2) {
             $botName = $this->getBotName();
             if ($commandName[1] === $botName) {
@@ -112,6 +157,18 @@ class TelegramController extends Controller
         $obj->message_type = 'message';
         $obj->text = $data['message']['text'];
         $obj->is_private = $data['message']['chat']['type'] === 'private';
+        $obj->is_channel_message = false;
+        $obj->sender_chat_username = null;
+        $obj->sender_chat_id = null;
+        if (isset($data['message']['sender_chat'])) {
+            $senderChat = $data['message']['sender_chat'];
+
+            if (isset($senderChat['type']) && $senderChat['type'] === 'channel') {
+                $obj->is_channel_message = true;
+                $obj->sender_chat_id = $senderChat['id'] ?? null;
+                $obj->sender_chat_username = $senderChat['username'] ?? $senderChat['title'] ?? null;
+            }
+        }
         if (isset($data['message']['reply_to_message']['text'])) {
             $obj->message_type = 'reply_message';
             $obj->reply_text = $data['message']['reply_to_message']['text'];
