@@ -16,23 +16,6 @@ class TelegramService
         $this->api = 'https://api.telegram.org/bot' . config('v2board.telegram_bot_token', $token) . '/';
     }
 
-    public function sendAndDeleteMessage(int $chatId, string $text, string $parseMode = '')
-    {
-        $response = $this->sendMessage($chatId, $text, $parseMode);
-
-        if (isset($response->result->message_id)) {
-            DeleteTelegramMessage::dispatch($chatId, $response->result->message_id)
-                ->delay(now()->addSeconds(15));
-        }
-
-        return $response;
-    }
-
-    public function scheduleDeleteMessage(int $chatId, int $messageId)
-    {
-        DeleteTelegramMessage::dispatch($chatId, $messageId)->delay(now()->addSeconds(5));
-    }
-
     public function deleteMessage(int $chatId, int $messageId)
     {
         $this->request('deleteMessage', [
@@ -41,20 +24,31 @@ class TelegramService
         ]);
     }
 
-    public function sendMessage(int $chatId, string $text, string $parseMode = '', array $extra = [])
-    {
-        if ($parseMode === 'markdown') {
-            $text = str_replace('_', '\_', $text);
-        }
-
-        $params = array_merge([
-            'chat_id' => $chatId,
-            'text' => $text,
-            'parse_mode' => $parseMode
-        ], $extra);
-
-        return $this->request('sendMessage', $params);
+public function sendMessage(int $chatId, string $text, string $parseMode = '', array $extra = [], int $autoDeleteSeconds = 0)
+{
+    if ($parseMode === 'markdown') {
+        $text = str_replace('_', '\_', $text);
     }
+
+    $params = array_merge([
+        'chat_id' => $chatId,
+        'text' => $text,
+        'parse_mode' => $parseMode
+    ], $extra);
+
+    $response = $this->request('sendMessage', $params);
+
+    // 如果指定了自动删除时间，调度删除消息任务
+    if ($autoDeleteSeconds > 0 && isset($response->result->message_id)) {
+        DeleteTelegramMessage::dispatch($chatId, $response->result->message_id)
+            ->delay(now()->addSeconds($autoDeleteSeconds));
+    }
+
+    return $response;
+}
+
+
+
 
     public function banChatMember(int $chatId, int $userId, ?int $untilDate = null, bool $revokeMessages = false)
     {
