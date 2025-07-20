@@ -61,7 +61,7 @@ class TelegramController extends Controller
                 if ($linkedChatId && $linkedChatId == $msg->sender_chat_id) {
                     // 是关联频道
                     \Log::info("[Telegram] 检测到关联频道发言，跳过删除与封禁: {$msg->sender_chat_id}");
-                    return false;
+                    return true;
                 }
             }
     
