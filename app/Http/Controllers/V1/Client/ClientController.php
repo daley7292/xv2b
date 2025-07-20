@@ -237,7 +237,6 @@ class ClientController extends Controller
             }
             [$keyword, $oldHost, $newHost] = $parts;
             if (strpos($userAgent, strtolower($keyword)) !== false) {
-                \Log::info("UA规则命中：{$keyword}，将 host 中包含 {$oldHost} 替换为 {$newHost}");
                 foreach ($servers as &$server) {
                     if (isset($server['host']) && stripos($server['host'], $oldHost) !== false) {
                         $server['host'] = str_ireplace($oldHost, $newHost, $server['host']);

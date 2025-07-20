@@ -16,9 +16,6 @@ class Checkin extends Telegram
     public function handle($message, $match = [])
     {
         $telegramService = $this->telegramService;
-        if (isset($message->chat_id) && isset($message->message_id)) {
-            $telegramService->sendMessage($message->chat_id, $message->message_id);
-        }
         if (!isset($message->from) || !isset($message->from->id)) {
             $telegramService->sendMessage($message->chat_id, '无法识别用户信息', 'markdown');
             return;

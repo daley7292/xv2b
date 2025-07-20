@@ -24,7 +24,6 @@ class TelegramController extends Controller
 
     public function webhook(Request $request)
     {
-        \Log::info('[Telegram Webhook] Received message: ', $request->all());
         $this->formatMessage($request->input());
         if ($this->checkAndKickChannelMessage()) {
             return;
