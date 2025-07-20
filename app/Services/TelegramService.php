@@ -7,7 +7,8 @@ use App\Models\User;
 use \Curl\Curl;
 use Illuminate\Mail\Markdown;
 
-class TelegramService {
+class TelegramService
+{
     protected $api;
 
     public function __construct($token = '')
@@ -18,15 +19,15 @@ class TelegramService {
     public function sendAndDeleteMessage(int $chatId, string $text, string $parseMode = '')
     {
         $response = $this->sendMessage($chatId, $text, $parseMode);
-    
+
         if (isset($response->result->message_id)) {
             DeleteTelegramMessage::dispatch($chatId, $response->result->message_id)
                 ->delay(now()->addSeconds(15));
         }
-    
+
         return $response;
     }
-    
+
     public function scheduleDeleteMessage(int $chatId, int $messageId)
     {
         DeleteTelegramMessage::dispatch($chatId, $messageId)->delay(now()->addSeconds(5));
@@ -40,20 +41,38 @@ class TelegramService {
         ]);
     }
 
-public function sendMessage(int $chatId, string $text, string $parseMode = '', array $extra = [])
-{
-    if ($parseMode === 'markdown') {
-        $text = str_replace('_', '\_', $text);
+    public function sendMessage(int $chatId, string $text, string $parseMode = '', array $extra = [])
+    {
+        if ($parseMode === 'markdown') {
+            $text = str_replace('_', '\_', $text);
+        }
+
+        $params = array_merge([
+            'chat_id' => $chatId,
+            'text' => $text,
+            'parse_mode' => $parseMode
+        ], $extra);
+
+        return $this->request('sendMessage', $params);
     }
 
-    $params = array_merge([
-        'chat_id' => $chatId,
-        'text' => $text,
-        'parse_mode' => $parseMode
-    ], $extra);
+    public function kickChatMember(int $chatId, int $userId)
+    {
+        return $this->request('kickChatMember', [
+            'chat_id' => $chatId,
+            'user_id' => $userId,
+        ]);
+    }
 
-    return $this->request('sendMessage', $params);
-}
+
+    public function getChatMember($chatId, $userId)
+    {
+        return $this->request('getChatMember', [
+            'chat_id' => $chatId,
+            'user_id' => $userId,
+        ]);
+    }
+
 
     public function approveChatJoinRequest(int $chatId, int $userId)
     {
@@ -121,7 +140,7 @@ public function sendMessage(int $chatId, string $text, string $parseMode = '', a
         }
         return $commands;
     }
-    
+
     public function setMyCommands(array $commands)
     {
         $this->request('setMyCommands', [
@@ -135,7 +154,8 @@ public function sendMessage(int $chatId, string $text, string $parseMode = '', a
         $curl->get($this->api . $method . '?' . http_build_query($params));
         $response = $curl->response;
         $curl->close();
-        if (!isset($response->ok)) abort(500, '请求失败');
+        if (!isset($response->ok))
+            abort(500, '请求失败');
         if (!$response->ok) {
             abort(500, '来自TG的错误：' . $response->description);
         }
@@ -144,7 +164,8 @@ public function sendMessage(int $chatId, string $text, string $parseMode = '', a
 
     public function sendMessageWithAdmin($message, $isStaff = false)
     {
-        if (!config('v2board.telegram_bot_enable', 0)) return;
+        if (!config('v2board.telegram_bot_enable', 0))
+            return;
         $users = User::where(function ($query) use ($isStaff) {
             $query->where('is_admin', 1);
             if ($isStaff) {
