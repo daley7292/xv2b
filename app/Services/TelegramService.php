@@ -40,17 +40,20 @@ class TelegramService {
         ]);
     }
 
-    public function sendMessage(int $chatId, string $text, string $parseMode = '')
-    {
-        if ($parseMode === 'markdown') {
-            $text = str_replace('_', '\_', $text);
-        }
-        return $this->request('sendMessage', [
-            'chat_id' => $chatId,
-            'text' => $text,
-            'parse_mode' => $parseMode
-        ]);
+public function sendMessage(int $chatId, string $text, string $parseMode = '', array $extra = [])
+{
+    if ($parseMode === 'markdown') {
+        $text = str_replace('_', '\_', $text);
     }
+
+    $params = array_merge([
+        'chat_id' => $chatId,
+        'text' => $text,
+        'parse_mode' => $parseMode
+    ], $extra);
+
+    return $this->request('sendMessage', $params);
+}
 
     public function approveChatJoinRequest(int $chatId, int $userId)
     {
