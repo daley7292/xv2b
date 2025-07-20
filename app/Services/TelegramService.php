@@ -56,14 +56,31 @@ class TelegramService
         return $this->request('sendMessage', $params);
     }
 
-    public function kickChatMember(int $chatId, int $userId)
+    public function banChatMember(int $chatId, int $userId, ?int $untilDate = null, bool $revokeMessages = false)
     {
-        return $this->request('kickChatMember', [
+        $params = [
             'chat_id' => $chatId,
             'user_id' => $userId,
-        ]);
+        ];
+
+        if ($untilDate !== null) {
+            $params['until_date'] = $untilDate;
+        }
+
+        if ($revokeMessages) {
+            $params['revoke_messages'] = true;
+        }
+
+        return $this->request('banChatMember', $params);
     }
 
+    public function banChatSenderChat(int $chatId, int $sender_chat_id)
+    {
+        return $this->request('banChatSenderChat', [
+            'chat_id' => $chatId,
+            'sender_chat_id' => $sender_chat_id,
+        ]);
+    }
 
     public function getChatMember($chatId, $userId)
     {
