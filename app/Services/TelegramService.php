@@ -29,7 +29,7 @@ class TelegramService
     }
     
 
-    public function sendMessage(int $chatId, string $text, string $parseMode = '', array $extra = [], int $autoDeleteSeconds = 30)
+    public function sendMessage(int $chatId, string $text, string $parseMode = '', array $extra = [], int $autoDeleteSeconds = 0)
     {
         if ($parseMode === 'markdown') {
             $text = str_replace('_', '\_', $text);
