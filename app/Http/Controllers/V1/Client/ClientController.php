@@ -66,7 +66,7 @@ class ClientController extends Controller
             $serverService = new ServerService();
             $servers = $serverService->getAvailableServers($user);
             $servers = $this->filterServers($servers, $request);
-            $this->replaceServerHostByUaRule($servers, $request->userAgent());
+            $this->replaceServerHostByUaRule($servers, $request->userAgent() ?? '' );
             $servers = array_values($servers);
             if ($flag) {
                 if (!strpos($flag, 'sing')) {
