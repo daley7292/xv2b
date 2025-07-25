@@ -56,34 +56,20 @@ class TelegramController extends Controller
     
         try {
             $isLinkedChannel = false;
-    
-            // 判断是否是群组的关联频道
             if ($msg->sender_chat_id) {
                 $chatInfo = $this->telegramService->getChat($msg->chat_id);
                 $linkedChatId = $chatInfo->result->linked_chat_id ?? null;
-    
                 if ($linkedChatId && $linkedChatId == $msg->sender_chat_id) {
-                    // 是关联频道
-                    \Log::info("[Telegram] 检测到关联频道发言，跳过删除与封禁: {$msg->sender_chat_id}");
                     return true;
                 }
             }
-    
-            // 删除消息
             $this->telegramService->deleteMessage($msg->chat_id, $msg->message_id);
-    
-            // 封禁频道身份
             if ($msg->sender_chat_id) {
                 $this->telegramService->banChatSenderChat($msg->chat_id, $msg->sender_chat_id);
             }
-    
-            // 提示消息
             $channelUsername = $msg->sender_chat_username ?? '未知频道';
             $text = "⚠️ 检测到频道 @{$channelUsername} 身份发言，消息已删除并已封禁该频道发言权限。";
             $this->telegramService->sendMessage($msg->chat_id, $text, 'HTML');
-    
-            \Log::info("[Telegram] 删除并封禁频道身份消息: {$channelUsername}");
-    
             return true;
     
         } catch (\Exception $e) {
@@ -115,9 +101,8 @@ class TelegramController extends Controller
             ->first();
         
         if (!$user && !$msg->is_private) {
-            // 检查未绑定用户的发言限制
             if (!$this->checkUnboundUserLimit($msg)) {
-                return; // 如果超出限制，直接返回
+                return;
             }
         }
 
@@ -183,10 +168,7 @@ class TelegramController extends Controller
                 
                 $username = $msg->from->username ?? '无用户名';
                 $text = "⚠️ 用户 <a href=\"tg://user?id={$userId}\">@{$username}</a> 未绑定账户且超出发言限制，已被移出群组。";
-                $this->telegramService->sendMessage($chatId, $text, 'HTML');
-                
-                \Log::info("[Telegram] 用户 {$userId} 超出发言限制，已被踢出");
-                
+                $this->telegramService->sendMessage($chatId, $text, 'HTML');               
             } catch (\Exception $e) {
                 \Log::warning("[Telegram] 踢出超限用户失败：" . $e->getMessage());
             }
@@ -230,14 +212,10 @@ class TelegramController extends Controller
             $text .= "🔗 请私聊 @{$botName} 发送 /bind 订阅链接 绑定\n";
             $text .= "⚠️ 下次发言将被移出群组！";
         }
-        
-        // 发送提醒消息，以回复的形式，30秒后自动删除
         $extra = [
             'reply_to_message_id' => $msg->message_id
         ];
         $this->telegramService->sendMessage($chatId, $text, 'HTML', $extra, 60);
-        
-        \Log::info("[Telegram] 向用户 {$userId} 发送绑定提醒，剩余次数：{$remaining}");
     }
 
     public function getBotName()
