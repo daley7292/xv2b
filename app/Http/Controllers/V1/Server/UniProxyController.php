@@ -29,12 +29,15 @@ class UniProxyController extends Controller
             abort(500, 'token is error');
         }
         $this->nodeType = $request->input('node_type');
-        if ($this->nodeType === 'v2ray') $this->nodeType = 'vmess';
-        if ($this->nodeType === 'hysteria2') $this->nodeType = 'hysteria';
+        if ($this->nodeType === 'v2ray')
+            $this->nodeType = 'vmess';
+        if ($this->nodeType === 'hysteria2')
+            $this->nodeType = 'hysteria';
         $this->nodeId = $request->input('node_id');
         $this->serverService = new ServerService();
         $this->nodeInfo = $this->serverService->getServer($this->nodeId, $this->nodeType);
-        if (!$this->nodeInfo) abort(500, 'server is not exist');
+        if (!$this->nodeInfo)
+            abort(500, 'server is not exist');
     }
 
     // 后端获取用户
@@ -106,131 +109,131 @@ class UniProxyController extends Controller
             }
             return $alive;
         });
-        return response()->json(['alive' => (object)$alive]);
+        return response()->json(['alive' => (object) $alive]);
     }
 
     // 后端提交在线数据
-public function alive(Request $request)
-{
-    $data = $request->json()->all();
-    if (empty($data)) {
-        $data = $_POST;
-    }
-    if ($data === null && json_last_error() !== JSON_ERROR_NONE) {
-        return response([
-            'error' => 'Invalid online data'
-        ], 400);
-    }
-    
-    $updateAt = time();
-    $recordsToProcess = [];
-    
-    foreach ($data as $uid => $ips) {
-        $ips_array = Cache::get('ALIVE_IP_USER_' . $uid) ?? [];
-        // 更新节点数据
-        $ips_array[$this->nodeType . $this->nodeId] = ['aliveips' => $ips, 'lastupdateAt' => $updateAt];
-        
-        // 清理过期数据
-        foreach ($ips_array as $nodetypeid => $oldips) {
-            if (!is_int($oldips) && ($updateAt - $oldips['lastupdateAt'] > 100)) {
-                unset($ips_array[$nodetypeid]);
-            }
+    public function alive(Request $request)
+    {
+        $data = $request->json()->all();
+        if (empty($data)) {
+            $data = $_POST;
         }
-        
-        $count = 0;
-        if (config('v2board.device_limit_mode', 0) == 1) {
-            $ipmap = [];
+        if ($data === null && json_last_error() !== JSON_ERROR_NONE) {
+            return response([
+                'error' => 'Invalid online data'
+            ], 400);
+        }
+
+        $updateAt = time();
+        $recordsToProcess = [];
+
+        foreach ($data as $uid => $ips) {
+            $ips_array = Cache::get('ALIVE_IP_USER_' . $uid) ?? [];
+            // 更新节点数据
+            $ips_array[$this->nodeType . $this->nodeId] = ['aliveips' => $ips, 'lastupdateAt' => $updateAt];
+
+            // 清理过期数据
+            foreach ($ips_array as $nodetypeid => $oldips) {
+                if (!is_int($oldips) && ($updateAt - $oldips['lastupdateAt'] > 100)) {
+                    unset($ips_array[$nodetypeid]);
+                }
+            }
+
+            $count = 0;
+            if (config('v2board.device_limit_mode', 0) == 1) {
+                $ipmap = [];
+                foreach ($ips_array as $nodetypeid => $newdata) {
+                    if (!is_int($newdata) && isset($newdata['aliveips'])) {
+                        foreach ($newdata['aliveips'] as $ip_NodeId) {
+                            $ip = explode("_", $ip_NodeId)[0];
+                            $ipmap[$ip] = 1;
+                        }
+                    }
+                }
+                $count = count($ipmap);
+            } else {
+                foreach ($ips_array as $nodetypeid => $newdata) {
+                    if (!is_int($newdata) && isset($newdata['aliveips'])) {
+                        $count += count($newdata['aliveips']);
+                    }
+                }
+            }
+
+            $ips_array['alive_ip'] = $count;
+            Cache::put('ALIVE_IP_USER_' . $uid, $ips_array, 120);
+
+            // 收集当前用户的所有活跃IP用于后续处理
+            $userIps = [];
             foreach ($ips_array as $nodetypeid => $newdata) {
                 if (!is_int($newdata) && isset($newdata['aliveips'])) {
                     foreach ($newdata['aliveips'] as $ip_NodeId) {
                         $ip = explode("_", $ip_NodeId)[0];
-                        $ipmap[$ip] = 1;
+                        if (filter_var($ip, FILTER_VALIDATE_IP)) {
+                            $userIps[] = $ip;
+                        }
                     }
                 }
             }
-            $count = count($ipmap);
-        } else {
-            foreach ($ips_array as $nodetypeid => $newdata) {
-                if (!is_int($newdata) && isset($newdata['aliveips'])) {
-                    $count += count($newdata['aliveips']);
-                }
+            if (!empty($userIps)) {
+                $recordsToProcess[$uid] = array_unique($userIps);
             }
         }
-        
-        $ips_array['alive_ip'] = $count;
-        Cache::put('ALIVE_IP_USER_' . $uid, $ips_array, 120);
-        
-        // 收集当前用户的所有活跃IP用于后续处理
-        $userIps = [];
-        foreach ($ips_array as $nodetypeid => $newdata) {
-            if (!is_int($newdata) && isset($newdata['aliveips'])) {
-                foreach ($newdata['aliveips'] as $ip_NodeId) {
-                    $ip = explode("_", $ip_NodeId)[0];
-                    if (filter_var($ip, FILTER_VALIDATE_IP)) {
-                        $userIps[] = $ip;
+
+        // 处理数据库记录 - 修复重复插入问题
+        foreach ($recordsToProcess as $uid => $ips) {
+            $user = User::find($uid);
+            if (!$user) {
+                continue;
+            }
+
+            foreach ($ips as $ip) {
+                try {
+                    // 检查缓存
+                    $cacheKey = "ip_geo_data:{$ip}";
+                    $ipData = Cache::get($cacheKey);
+
+                    if (!$ipData) {
+                        // 缓存不存在，请求API
+                        $response = Http::timeout(3)->get("https://ipvx.netart.cn/{$ip}");
+                        if ($response->successful()) {
+                            $ipData = $response->json();
+                            // 缓存24小时
+                            Cache::put($cacheKey, $ipData, 1440);
+                        } else {
+                            // API请求失败，缓存空结果5分钟避免频繁请求
+                            $ipData = [];
+                            Cache::put($cacheKey, $ipData, 5);
+                        }
                     }
+
+                    // 使用 updateOrCreate 避免重复插入错误
+                    V2UserConnectLog::updateOrCreate(
+                        [
+                            'user_id' => $uid,
+                            'ip' => $ip
+                        ],
+                        [
+                            'email' => $user->email,
+                            'as_number' => $ipData['as']['number'] ?? null,
+                            'as_name' => $ipData['as']['name'] ?? null,
+                            'country' => $ipData['country']['name'] ?? null,
+                            'region' => implode(',', $ipData['regions_short'] ?? []),
+                            'updated_at' => now()  // 更新时间戳
+                        ]
+                    );
+
+                } catch (\Exception $e) {
+                    \Log::error("IP 信息处理异常：{$ip}, 错误：" . $e->getMessage());
                 }
             }
         }
-        if (!empty($userIps)) {
-            $recordsToProcess[$uid] = array_unique($userIps);
-        }
+
+        return response([
+            'data' => true
+        ]);
     }
-    
-    // 处理数据库记录 - 修复重复插入问题
-    foreach ($recordsToProcess as $uid => $ips) {
-        $user = User::find($uid);
-        if (!$user) {
-            continue;
-        }
-        
-        foreach ($ips as $ip) {
-            try {
-                // 检查缓存
-                $cacheKey = "ip_geo_data:{$ip}";
-                $ipData = Cache::get($cacheKey);
-                
-                if (!$ipData) {
-                    // 缓存不存在，请求API
-                    $response = Http::timeout(3)->get("https://ipvx.netart.cn/{$ip}");
-                    if ($response->successful()) {
-                        $ipData = $response->json();
-                        // 缓存24小时
-                        Cache::put($cacheKey, $ipData, 1440);
-                    } else {
-                        // API请求失败，缓存空结果5分钟避免频繁请求
-                        $ipData = [];
-                        Cache::put($cacheKey, $ipData, 5);
-                    }
-                }
-                
-                // 使用 updateOrCreate 避免重复插入错误
-                V2UserConnectLog::updateOrCreate(
-                    [
-                        'user_id' => $uid,
-                        'ip' => $ip
-                    ],
-                    [
-                        'email' => $user->email,
-                        'as_number' => $ipData['as']['number'] ?? null,
-                        'as_name' => $ipData['as']['name'] ?? null,
-                        'country' => $ipData['country']['name'] ?? null,
-                        'region' => implode(',', $ipData['regions_short'] ?? []),
-                        'updated_at' => now()  // 更新时间戳
-                    ]
-                );
-                
-            } catch (\Exception $e) {
-                \Log::error("IP 信息处理异常：{$ip}, 错误：" . $e->getMessage());
-            }
-        }
-    }
-    
-    return response([
-        'data' => true
-    ]);
-}
-    
+
     public function config(Request $request)
     {
         switch ($this->nodeType) {
@@ -314,8 +317,8 @@ public function alive(Request $request)
                 break;
         }
         $response['base_config'] = [
-            'push_interval' => (int)config('v2board.server_push_interval', 60),
-            'pull_interval' => (int)config('v2board.server_pull_interval', 60)
+            'push_interval' => (int) config('v2board.server_push_interval', 60),
+            'pull_interval' => (int) config('v2board.server_pull_interval', 60)
         ];
         if ($this->nodeInfo['route_id']) {
             $response['routes'] = $this->serverService->getRoutes($this->nodeInfo['route_id']);
