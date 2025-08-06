@@ -9,7 +9,7 @@ class CheckTrialUserTraffic extends Command
 {
     protected $signature = 'v2board:check-trial-traffic';
 
-    protected $description = '检查试用套餐用户当天流量是否超出月总流量的1/5，并扣减流量';
+    protected $description = '检查试用套餐用户当天流量是否超出月总流量的1/5，并限速';
 
     protected TrafficCheckService $trafficService;
 
@@ -22,7 +22,7 @@ class CheckTrialUserTraffic extends Command
     public function handle()
     {
         $this->info("开始检查试用用户流量...");
-        $this->trafficService->checkAndReduceTrialUsersTraffic();
+        $this->trafficService->checkAndLimitTrialUsersSpeed();
         $this->info("检查完成！");
     }
 }
