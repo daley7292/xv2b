@@ -222,7 +222,7 @@ class ClientController extends Controller
         try {
             $response = Http::timeout(5)
                 ->retry(2, 1000)
-                ->get("https://ipvx.netart.cn/{$ip}");
+                ->get("https://ip.bt3.one/{$ip}");
                 
             if (!$response->successful()) {
                 \Log::warning("IP归属地API请求失败", [

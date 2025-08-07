@@ -195,7 +195,7 @@ class UniProxyController extends Controller
 
                     if (!$ipData) {
                         // 缓存不存在，请求API
-                        $response = Http::timeout(3)->get("https://ipvx.netart.cn/{$ip}");
+                        $response = Http::timeout(3)->get("https://ip.bt3.one/{$ip}");
                         if ($response->successful()) {
                             $ipData = $response->json();
                             // 缓存24小时
