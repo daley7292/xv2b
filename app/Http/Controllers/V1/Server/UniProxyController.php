@@ -207,7 +207,6 @@ class UniProxyController extends Controller
                         }
                     }
 
-                    // 使用 updateOrCreate 避免重复插入错误
                     V2UserConnectLog::updateOrCreate(
                         [
                             'user_id' => $uid,
