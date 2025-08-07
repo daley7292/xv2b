@@ -224,7 +224,6 @@ class UniProxyController extends Controller
                     );
 
                 } catch (\Exception $e) {
-                    \Log::error("IP 信息处理异常：{$ip}, 错误：" . $e->getMessage());
                 }
             }
         }
