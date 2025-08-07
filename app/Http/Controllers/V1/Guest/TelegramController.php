@@ -14,7 +14,7 @@ class TelegramController extends Controller
     protected $telegramService;
     
     // 未绑定用户发言限制相关常量
-    private const UNBOUND_USER_HOURLY_LIMIT = 10;
+    private const UNBOUND_USER_HOURLY_LIMIT = 3;
     private const CACHE_PREFIX = 'telegram_unbound_user_';
 
     public function __construct(Request $request)
