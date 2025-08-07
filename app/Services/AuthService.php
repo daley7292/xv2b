@@ -63,7 +63,7 @@ class AuthService
                 ])->find($data['id']);
                 if (!$user)
                     return false;
-                Cache::put($jwt, $user->toArray(), 3600);
+                Cache::put($jwt, $user->toArray(), 6 * 3600);
             }
             return Cache::get($jwt);
         } catch (ExpiredException $e) {
@@ -92,7 +92,8 @@ class AuthService
         if (
             !Cache::put(
                 $cacheKey,
-                $sessions
+                $sessions,
+                6 * 3600
             )
         )
             return false;
@@ -112,7 +113,8 @@ class AuthService
         if (
             !Cache::put(
                 $cacheKey,
-                $sessions
+                $sessions,
+                6 * 3600
             )
         )
             return false;
