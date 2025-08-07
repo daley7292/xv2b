@@ -12,6 +12,7 @@ class Checkin extends Telegram
 {
     public $command = '/checkin';
     public $description = '每日签到，领取流量奖励';
+    public $keywords = ['签到', 'checkin'];
 
     public function handle($message, $match = [])
     {
