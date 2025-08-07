@@ -43,6 +43,6 @@ class CacheKey
         if (!in_array($key, array_keys(self::KEYS))) {
             abort(500, 'key is not in cache key list');
         }
-        return $key . '_' . $uniqueValue;
+        return $key . ':' . $uniqueValue;
     }
 }
