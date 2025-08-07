@@ -95,7 +95,7 @@ class UniProxyController extends Controller
             $keys = [];
             $idMap = [];
             foreach ($users as $user) {
-                $key = 'ALIVE_IP_USER_' . $user->id;
+                $key = 'ALIVE_IP_USER:' . $user->id;
                 $keys[] = $key;
                 $idMap[$key] = $user->id;
             }
@@ -129,7 +129,7 @@ class UniProxyController extends Controller
         $recordsToProcess = [];
 
         foreach ($data as $uid => $ips) {
-            $ips_array = Cache::get('ALIVE_IP_USER_' . $uid) ?? [];
+            $ips_array = Cache::get('ALIVE_IP_USER:' . $uid) ?? [];
             // 更新节点数据
             $ips_array[$this->nodeType . $this->nodeId] = ['aliveips' => $ips, 'lastupdateAt' => $updateAt];
 
@@ -161,7 +161,7 @@ class UniProxyController extends Controller
             }
 
             $ips_array['alive_ip'] = $count;
-            Cache::put('ALIVE_IP_USER_' . $uid, $ips_array, 120);
+            Cache::put('ALIVE_IP_USER:' . $uid, $ips_array, 120);
 
             // 收集当前用户的所有活跃IP用于后续处理
             $userIps = [];

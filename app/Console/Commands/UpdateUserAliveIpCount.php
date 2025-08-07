@@ -82,14 +82,14 @@ class UpdateUserAliveIpCount extends Command
         
         // 批量获取缓存数据
         foreach ($users as $user) {
-            $cacheKeys[] = 'ALIVE_IP_USER_' . $user->id;
+            $cacheKeys[] = 'ALIVE_IP_USER:' . $user->id;
         }
         
         // 使用 Cache::many() 批量获取缓存，提高性能
         $cacheData = Cache::many($cacheKeys);
         
         foreach ($users as $user) {
-            $cacheKey = 'ALIVE_IP_USER_' . $user->id;
+            $cacheKey = 'ALIVE_IP_USER:' . $user->id;
             $ipsArray = $cacheData[$cacheKey] ?? null;
             
             $aliveIpCount = 0;

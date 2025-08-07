@@ -279,7 +279,7 @@ class UserController extends Controller
 
         //统计在线设备
         $countalive = 0;
-        $ips_array = Cache::get('ALIVE_IP_USER_' . $request->user['id']);        
+        $ips_array = Cache::get('ALIVE_IP_USER:' . $request->user['id']);        
         if ($ips_array && isset($ips_array['alive_ip'])) {
             $countalive = $ips_array['alive_ip'];
         } else {
