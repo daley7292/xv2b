@@ -231,6 +231,10 @@ class AuthController extends Controller
             }
         }
         DB::commit();
+        $logData['ip'] = $request->ip();
+        $logData['user_id'] = $user->id;
+        $logData['user_agent'] = $request->header('User-Agent');
+        \Log::info('用户注册成功: ' . json_encode($logData, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));
         //邀请人奖励
         $inviteGiveType = (int)config('v2board.is_Invitation_to_give', 0);
         if ($inviteGiveType === 1 || $inviteGiveType === 3) {
