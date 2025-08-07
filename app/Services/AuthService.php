@@ -51,21 +51,29 @@ class AuthService
     public static function decryptAuthData($jwt)
     {
         try {
-            if (!Cache::has($jwt)) {
+            $cacheKey = 'DECRYPT_AUTH_DATA:' . $jwt;
+
+            if (!Cache::has($cacheKey)) {
                 $data = (array) JWT::decode($jwt, new Key(config('app.key'), 'HS256'));
-                if (!self::checkSession($data['id'], $data['session']))
+                if (!self::checkSession($data['id'], $data['session'])) {
                     return false;
+                }
+
                 $user = User::select([
                     'id',
                     'email',
                     'is_admin',
                     'is_staff'
                 ])->find($data['id']);
-                if (!$user)
+
+                if (!$user) {
                     return false;
-                Cache::put($jwt, $user->toArray(), 6 * 3600);
+                }
+
+                Cache::put($cacheKey, $user->toArray(), 6 * 3600);
             }
-            return Cache::get($jwt);
+
+            return Cache::get($cacheKey);
         } catch (ExpiredException $e) {
             return false; // Token 已过期
         } catch (SignatureInvalidException $e) {
@@ -74,6 +82,7 @@ class AuthService
             return false; // 其他错误
         }
     }
+
 
 
     private static function checkSession($userId, $session)

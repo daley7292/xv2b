@@ -190,7 +190,7 @@ class UniProxyController extends Controller
             foreach ($ips as $ip) {
                 try {
                     // 检查缓存
-                    $cacheKey = "ip_geo_data:{$ip}";
+                    $cacheKey = "IP_GEO_DATA:{$ip}";
                     $ipData = Cache::get($cacheKey);
 
                     if (!$ipData) {

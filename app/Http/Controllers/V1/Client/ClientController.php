@@ -199,7 +199,7 @@ class ClientController extends Controller
             return $this->getEmptyLocation();
         }
         
-        $cacheKey = "ip_geo_data:{$ip}";  // 与第一个函数使用相同的缓存键
+        $cacheKey = "IP_GEO_DATA:{$ip}";  // 与第一个函数使用相同的缓存键
         
         // 尝试从缓存获取
         try {
