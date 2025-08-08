@@ -25,9 +25,20 @@ class SendEmailJob implements ShouldQueue
     private $rateLimitKey = 'email_rate_limit';
     private $maxEmailsPerMinute = 60;
     private $maxEmailsPerHour = 3600;
+    private $verifyQueueKey = 'verify_email_queue_count';
 
     public function __construct($params, $queue = 'send_email')
     {
+        $templateName = $params['template_name'] ?? '';
+        $isVerifyEmail = strpos($templateName, 'verify') !== false;
+        
+        if ($isVerifyEmail) {
+            // 验证邮件使用高优先级队列
+            $queue = 'high_priority_email';
+            // 增加验证邮件队列计数
+            Redis::incr($this->verifyQueueKey);
+        }
+        
         $this->onQueue($queue);
         $this->params = $params;
         $this->maxEmailsPerMinute = config('v2board.email_rate_limit.per_minute', 60);
@@ -36,6 +47,16 @@ class SendEmailJob implements ShouldQueue
 
     public function handle()
     {
+        $templateName = $this->params['template_name'] ?? '';
+        $isVerifyEmail = strpos($templateName, 'verify') !== false;
+        
+        // 如果不是验证邮件，检查是否还有验证邮件待发送
+        if (!$isVerifyEmail && $this->hasVerifyEmailsInQueue()) {
+            $this->release(30); // 延迟30秒后重试
+            Log::info('Normal email delayed due to pending verify emails', ['email' => $this->params['email']]);
+            return;
+        }
+
         if (!$this->checkRateLimit()) {
             $this->release(60);
             Log::info('Email job delayed due to rate limit', ['email' => $this->params['email']]);
@@ -52,7 +73,12 @@ class SendEmailJob implements ShouldQueue
         
         try {
             $this->incrementRateLimit();
-            $this->adaptiveDelay();
+            
+            // 验证邮件立即发送，普通邮件使用自适应延迟
+            if (!$isVerifyEmail) {
+                $this->adaptiveDelay();
+            }
+            
             Mail::send(
                 $params['template_name'],
                 $params['template_value'],
@@ -61,19 +87,44 @@ class SendEmailJob implements ShouldQueue
                 }
             );
             
-            Log::info('Email sent successfully', ['email' => $email, 'subject' => $subject]);
+            Log::info('Email sent successfully', [
+                'email' => $email, 
+                'subject' => $subject,
+                'type' => $isVerifyEmail ? 'verify' : 'normal'
+            ]);
+            
+            // 如果是验证邮件，减少队列计数
+            if ($isVerifyEmail) {
+                $this->decrementVerifyQueueCount();
+            }
             
         } catch (\Exception $e) {
             $error = $e->getMessage();
             
             if ($this->isRateLimitError($e)) {
                 $this->decrementRateLimit();
-                $this->release(120);
-                Log::warning('SMTP rate limit hit, job released', ['email' => $email, 'error' => $error]);
+                
+                $releaseTime = $isVerifyEmail ? 60 : 120;
+                $this->release($releaseTime);
+                
+                Log::warning('SMTP rate limit hit, job released', [
+                    'email' => $email, 
+                    'error' => $error,
+                    'type' => $isVerifyEmail ? 'verify' : 'normal'
+                ]);
                 return;
             }
             
-            Log::error('Email sending failed', ['email' => $email, 'error' => $error]);
+            // 如果验证邮件发送失败，也要减少队列计数
+            if ($isVerifyEmail) {
+                $this->decrementVerifyQueueCount();
+            }
+            
+            Log::error('Email sending failed', [
+                'email' => $email, 
+                'error' => $error,
+                'type' => $isVerifyEmail ? 'verify' : 'normal'
+            ]);
         }
 
         $log = [
@@ -81,7 +132,8 @@ class SendEmailJob implements ShouldQueue
             'subject' => $params['subject'],
             'template_name' => $params['template_name'],
             'error' => $error,
-            'sent_at' => Carbon::now()
+            'sent_at' => Carbon::now(),
+            'is_verify_email' => $isVerifyEmail
         ];
         
         MailLog::create($log);
@@ -190,6 +242,26 @@ class SendEmailJob implements ShouldQueue
         return false;
     }
 
+    /**
+     * 检查是否还有验证邮件在队列中待发送
+     */
+    private function hasVerifyEmailsInQueue(): bool
+    {
+        $count = Redis::get($this->verifyQueueKey) ?: 0;
+        return $count > 0;
+    }
+
+    /**
+     * 减少验证邮件队列计数
+     */
+    private function decrementVerifyQueueCount()
+    {
+        $count = Redis::get($this->verifyQueueKey) ?: 0;
+        if ($count > 0) {
+            Redis::decr($this->verifyQueueKey);
+        }
+    }
+
     public function getRateLimitStatus(): array
     {
         $now = Carbon::now();
@@ -207,7 +279,8 @@ class SendEmailJob implements ShouldQueue
                 'count' => Redis::get($hourKey) ?: 0,
                 'limit' => $this->maxEmailsPerHour,
                 'remaining' => $this->maxEmailsPerHour - (Redis::get($hourKey) ?: 0)
-            ]
+            ],
+            'verify_queue_count' => Redis::get($this->verifyQueueKey) ?: 0
         ];
     }
 }
