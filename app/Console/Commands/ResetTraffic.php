@@ -11,44 +11,48 @@ use App\Services\UserService;
 
 class ResetTraffic extends Command
 {
-    protected $builder;
-
     protected $signature = 'reset:traffic';
     protected $description = '流量清空';
 
-    protected UserService $userService;
+    protected $userService;
 
     public function __construct(UserService $userService)
     {
         parent::__construct();
 
         $this->userService = $userService;
-
-        $this->builder = User::whereNotNull('expired_at')
-            ->where('expired_at', '>', time());
     }
 
     public function handle()
     {
         ini_set('memory_limit', -1);
 
-        $resetMethods = Plan::select(
-            DB::raw("GROUP_CONCAT(`id`) as plan_ids"),
-            DB::raw("reset_traffic_method as method")
-        )
+        $builder = User::whereNotNull('expired_at')->where('expired_at', '>', time());
+
+        $resetMethods = Plan::selectRaw('GROUP_CONCAT(id) as plan_ids, reset_traffic_method as method')
             ->groupBy('reset_traffic_method')
             ->get();
 
         foreach ($resetMethods as $resetMethod) {
             $planIds = explode(',', $resetMethod->plan_ids);
-            $builder = clone $this->builder;
-            $builder->whereIn('plan_id', $planIds);
+            $usersQuery = (clone $builder)->whereIn('plan_id', $planIds);
 
-            $users = $builder->get()->filter(function ($user) use ($resetMethod) {
-                if ($resetMethod->method === null) {
-                    $user->plan->reset_traffic_method = (int) config('v2board.reset_traffic_method', 0);
+            $users = $usersQuery->get()->filter(function ($user) use ($resetMethod) {
+                // 取套餐方法，若套餐未设置则用分组的method（数据库中该组的method）
+                $method = $resetMethod->method;
+                if ($method === null && isset($user->plan)) {
+                    $method = $user->plan->reset_traffic_method;
                 }
-                return $this->userService->isResetDay($user);
+                if ($method === null) {
+                    $method = (int) config('v2board.reset_traffic_method', 0);
+                }
+
+                if ($method === 2) { // 不重置
+                    return false;
+                }
+
+                // 传入覆盖参数，避免修改 $user->plan 属性
+                return $this->userService->isResetDay($user, (int) $method);
             });
 
             if ($users->isNotEmpty()) {
@@ -62,15 +66,21 @@ class ResetTraffic extends Command
     private function resetUserTraffic($users)
     {
         foreach ($users as $user) {
-            $plan = Plan::find($user->plan_id);
-            if (!$plan || $plan->transfer_enable === null) {
+            if (!isset($user->plan)) {
+                if ($user->plan_id === null) {
+                    continue;
+                }
+                $user->plan = Plan::find($user->plan_id);
+            }
+
+            if (!$user->plan || $user->plan->transfer_enable === null) {
                 continue;
             }
 
             $user->update([
                 'u' => 0,
                 'd' => 0,
-                'transfer_enable' => $plan->transfer_enable * 1024 * 1024 * 1024,
+                'transfer_enable' => $user->plan->transfer_enable * 1024 * 1024 * 1024,
             ]);
         }
     }
