@@ -7,6 +7,7 @@ use App\Models\User;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
 use App\Services\TelegramService;
+use App\Services\UserService;
 
 class ResetTraffic extends Command
 {
@@ -15,9 +16,14 @@ class ResetTraffic extends Command
     protected $signature = 'reset:traffic';
     protected $description = '流量清空';
 
-    public function __construct()
+    protected UserService $userService;
+
+    public function __construct(UserService $userService)
     {
         parent::__construct();
+
+        $this->userService = $userService;
+
         $this->builder = User::whereNotNull('expired_at')
             ->where('expired_at', '>', time());
     }
@@ -31,145 +37,26 @@ class ResetTraffic extends Command
             DB::raw("reset_traffic_method as method")
         )
             ->groupBy('reset_traffic_method')
-            ->get()
-            ->toArray();
+            ->get();
 
         foreach ($resetMethods as $resetMethod) {
-            $planIds = explode(',', $resetMethod['plan_ids']);
-            $method = $resetMethod['method'];
-            $builder = with(clone ($this->builder))->whereIn('plan_id', $planIds);
+            $planIds = explode(',', $resetMethod->plan_ids);
+            $builder = clone $this->builder;
+            $builder->whereIn('plan_id', $planIds);
 
-            if ($method === null) {
-                $method = (int) config('v2board.reset_traffic_method', 0);
-            }
-
-            switch ((int) $method) {
-                case 0: {
-                    $this->resetByMonthFirstDay($builder);
-                    break;
+            $users = $builder->get()->filter(function ($user) use ($resetMethod) {
+                if ($resetMethod->method === null) {
+                    $user->plan->reset_traffic_method = (int) config('v2board.reset_traffic_method', 0);
                 }
-                case 1: {
-                    $this->resetByExpireDay($builder);
-                    break;
-                }
-                case 2: {
-                    break;
-                }
-                case 3: {
-                    $this->resetByYearFirstDay($builder);
-                    break;
-                }
-                case 4: {
-                    $this->resetByExpireYear($builder);
-                    break;
-                }
-                case 5: {
-                    $this->resetByQuarterCycle($builder);
-                    break;
-                }
-                case 6: {
-                    $this->resetByHalfYearCycle($builder);
-                    break;
-                }
-            }
-        }
-    }
-
-    private function resetByExpireYear($builder): void
-    {
-        $today = date('m-d');
-
-        $users = $builder->get()->filter(function ($user) use ($today) {
-            return date('m-d', $user->expired_at) === $today;
-        });
-
-        $this->retryTransaction(function () use ($users) {
-            $this->resetUserTraffic($users);
-        });
-    }
-
-    private function resetByYearFirstDay($builder): void
-    {
-        if (date('md') === '0101') {
-            $users = $builder->get();
-            $this->retryTransaction(function () use ($users) {
-                $this->resetUserTraffic($users);
+                return $this->userService->isResetDay($user);
             });
-        }
-    }
 
-    private function resetByMonthFirstDay($builder): void
-    {
-        if (date('d') === '01') {
-            $users = $builder->get();
-            $this->retryTransaction(function () use ($users) {
-                $this->resetUserTraffic($users);
-            });
-        }
-    }
-
-    private function resetByExpireDay($builder): void
-    {
-        $lastDay = date('t');
-        $today = date('d');
-
-        $users = $builder->get()->filter(function ($user) use ($today, $lastDay) {
-            $expireDay = date('d', $user->expired_at);
-            return (
-                ($expireDay === $today || ($today === $lastDay && $expireDay >= $lastDay)) &&
-                (time() < $user->expired_at - 2160000)
-            );
-        });
-
-        $this->retryTransaction(function () use ($users) {
-            $this->resetUserTraffic($users);
-        });
-    }
-
-    private function resetByQuarterCycle($builder): void
-    {
-        $today = date('m-d');
-        $users = [];
-
-        foreach ($builder->get() as $user) {
-            $expiredMonth = (int) date('m', $user->expired_at);
-            $expiredDay = date('d', $user->expired_at);
-            for ($i = 0; $i < 4; $i++) {
-                $checkMonth = ($expiredMonth - $i * 3);
-                if ($checkMonth <= 0) {
-                    $checkMonth += 12;
-                }
-
-                if ((int) date('m') === $checkMonth && date('d') === $expiredDay) {
-                    $users[] = $user;
-                    break;
-                }
+            if ($users->isNotEmpty()) {
+                $this->retryTransaction(function () use ($users) {
+                    $this->resetUserTraffic($users);
+                });
             }
         }
-
-        $this->resetUserTraffic($users);
-    }
-    private function resetByHalfYearCycle($builder): void
-    {
-        $today = date('m-d');
-        $users = [];
-
-        foreach ($builder->get() as $user) {
-            $expiredMonth = (int) date('m', $user->expired_at);
-            $expiredDay = date('d', $user->expired_at);
-            for ($i = 0; $i < 2; $i++) {
-                $checkMonth = ($expiredMonth - $i * 6);
-                if ($checkMonth <= 0) {
-                    $checkMonth += 12;
-                }
-                if ((int) date('m') === $checkMonth && date('d') === $expiredDay) {
-                    $users[] = $user;
-                    break;
-                }
-            }
-        }
-
-        $this->resetUserTraffic($users);
     }
 
     private function resetUserTraffic($users)
@@ -183,7 +70,7 @@ class ResetTraffic extends Command
             $user->update([
                 'u' => 0,
                 'd' => 0,
-                'transfer_enable' => $plan->transfer_enable * 1024 * 1024 * 1024
+                'transfer_enable' => $plan->transfer_enable * 1024 * 1024 * 1024,
             ]);
         }
     }
