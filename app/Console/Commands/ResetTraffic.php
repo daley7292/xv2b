@@ -4,114 +4,136 @@ namespace App\Console\Commands;
 
 use App\Models\Plan;
 use App\Models\User;
+use App\Services\UserService;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
 use App\Services\TelegramService;
-use App\Services\UserService;
 
 class ResetTraffic extends Command
 {
-    protected $signature = 'reset:traffic';
+    protected $signature = 'reset:traffic {--dry-run : 预览模式} {--batch-size=500 : 批处理大小}';
     protected $description = '流量清空';
 
-    protected $userService;
+    private $userService;
 
     public function __construct(UserService $userService)
     {
         parent::__construct();
-
         $this->userService = $userService;
     }
 
     public function handle()
     {
         ini_set('memory_limit', -1);
-
-        $builder = User::whereNotNull('expired_at')->where('expired_at', '>', time());
-        $resetMethods = Plan::selectRaw('GROUP_CONCAT(id) as plan_ids, reset_traffic_method as method')
-            ->groupBy('reset_traffic_method')
-            ->get();
-
-        foreach ($resetMethods as $resetMethod) {
-            $planIds = explode(',', $resetMethod->plan_ids);
-            $usersQuery = (clone $builder)->whereIn('plan_id', $planIds);
-
-            $users = $usersQuery->get()->filter(function ($user) use ($resetMethod) {
-                $method = $resetMethod->method;
-
-                if ($method === null && isset($user->plan)) {
-                    $method = $user->plan->reset_traffic_method;
-                }
-
-                if ($method === null) {
-                    $method = (int) config('v2board.reset_traffic_method', 0);
-                }
-
-                if ($method === 2) { // 不重置
-                    return false;
-                }
-
-                return $this->userService->isResetDay($user, (int)$method);
-            });
-
-            if ($users->isNotEmpty()) {
-                $this->retryTransaction(function () use ($users) {
-                    $this->resetUserTraffic($users);
-                });
-            }
+        
+        $isDryRun = $this->option('dry-run');
+        $batchSize = (int) $this->option('batch-size');
+        
+        if ($isDryRun) {
+            $this->info('🔍 预览模式');
         }
+
+        $this->info('开始执行流量重置...');
+        $startTime = microtime(true);
+
+        try {
+            $resetCount = $this->processUsers($isDryRun, $batchSize);
+            
+            $executionTime = round(microtime(true) - $startTime, 2);
+            $this->info("完成！共处理 {$resetCount} 个用户，耗时 {$executionTime} 秒");
+            
+        } catch (\Exception $e) {
+            $this->error("执行失败: " . $e->getMessage());
+            $this->sendTelegramNotification("流量重置失败：" . $e->getMessage());
+            return 1;
+        }
+
+        return 0;
     }
 
-    private function resetUserTraffic($users)
+    private function processUsers(bool $isDryRun, int $batchSize): int
     {
-        foreach ($users as $user) {
-            if (!isset($user->plan)) {
-                if ($user->plan_id === null) {
+        $resetCount = 0;
+        
+        // 分批处理用户，避免内存溢出
+        User::with('plan')
+            ->whereNotNull('expired_at')
+            ->where('expired_at', '>', time())
+            ->whereNotNull('plan_id')
+            ->chunk($batchSize, function ($users) use (&$resetCount, $isDryRun) {
+                $usersToReset = [];
+                
+                // 找出今天需要重置的用户
+                foreach ($users as $user) {
+                    $resetDay = $this->userService->getResetDay($user);
+                    if ($resetDay === 0) {  // 今天重置
+                        $usersToReset[] = $user;
+                    }
+                }
+                
+                if (empty($usersToReset)) {
+                    return true; // 继续下一批
+                }
+                
+                $this->info("找到 " . count($usersToReset) . " 个用户需要重置");
+                
+                if (!$isDryRun) {
+                    $this->resetUsers($usersToReset);
+                }
+                
+                $resetCount += count($usersToReset);
+                return true;
+            });
+            
+        return $resetCount;
+    }
+
+    private function resetUsers(array $users): void
+    {
+        $this->retryTransaction(function () use ($users) {
+            foreach ($users as $user) {
+                if (!$user->plan || $user->plan->transfer_enable === null) {
                     continue;
                 }
-                $plan = Plan::find($user->plan_id);
-            } else {
-                $plan = $user->plan;
-            }
 
-            if (!$plan || $plan->transfer_enable === null) {
-                continue;
+                $user->update([
+                    'u' => 0,
+                    'd' => 0,
+                    'transfer_enable' => $user->plan->transfer_enable * 1024 * 1024 * 1024
+                ]);
             }
-
-            $user->update([
-                'u' => 0,
-                'd' => 0,
-                'transfer_enable' => $plan->transfer_enable * 1024 * 1024 * 1024,
-            ]);
-        }
+        });
     }
 
-    private function retryTransaction($callback)
+    private function retryTransaction($callback): void
     {
-        $attempts = 0;
         $maxAttempts = 3;
-
-        while ($attempts < $maxAttempts) {
+        
+        for ($attempt = 1; $attempt <= $maxAttempts; $attempt++) {
             try {
                 DB::transaction($callback);
                 return;
             } catch (\Exception $e) {
-                $attempts++;
-
-                if (
-                    $attempts >= $maxAttempts || (
-                        strpos($e->getMessage(), '40001') === false &&
-                        strpos(strtolower($e->getMessage()), 'deadlock') === false
-                    )
-                ) {
-                    (new TelegramService())->sendMessageWithAdmin(
-                        now()->format('Y/m/d H:i:s') . ' 用户流量重置失败：' . $e->getMessage()
-                    );
-                    abort(500, '用户流量重置失败：' . $e->getMessage());
+                if ($attempt >= $maxAttempts || 
+                    (strpos($e->getMessage(), '40001') === false && 
+                     strpos(strtolower($e->getMessage()), 'deadlock') === false)) {
+                    throw $e;
                 }
-
-                sleep(5);
+                
+                $this->warn("事务失败，正在重试 ({$attempt}/{$maxAttempts})");
+                sleep(2);
             }
+        }
+    }
+
+    private function sendTelegramNotification(string $message): void
+    {
+        try {
+            (new TelegramService())->sendMessageWithAdmin(
+                now()->format('Y/m/d H:i:s') . ' ' . $message
+            );
+        } catch (\Exception $e) {
+            $this->error("发送通知失败: " . $e->getMessage());
         }
     }
 }
