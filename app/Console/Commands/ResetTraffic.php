@@ -28,7 +28,6 @@ class ResetTraffic extends Command
         ini_set('memory_limit', -1);
 
         $builder = User::whereNotNull('expired_at')->where('expired_at', '>', time());
-
         $resetMethods = Plan::selectRaw('GROUP_CONCAT(id) as plan_ids, reset_traffic_method as method')
             ->groupBy('reset_traffic_method')
             ->get();
@@ -38,11 +37,12 @@ class ResetTraffic extends Command
             $usersQuery = (clone $builder)->whereIn('plan_id', $planIds);
 
             $users = $usersQuery->get()->filter(function ($user) use ($resetMethod) {
-                // 取套餐方法，若套餐未设置则用分组的method（数据库中该组的method）
                 $method = $resetMethod->method;
+
                 if ($method === null && isset($user->plan)) {
                     $method = $user->plan->reset_traffic_method;
                 }
+
                 if ($method === null) {
                     $method = (int) config('v2board.reset_traffic_method', 0);
                 }
@@ -51,8 +51,7 @@ class ResetTraffic extends Command
                     return false;
                 }
 
-                // 传入覆盖参数，避免修改 $user->plan 属性
-                return $this->userService->isResetDay($user, (int) $method);
+                return $this->userService->isResetDay($user, (int)$method);
             });
 
             if ($users->isNotEmpty()) {
@@ -70,17 +69,19 @@ class ResetTraffic extends Command
                 if ($user->plan_id === null) {
                     continue;
                 }
-                $user->plan = Plan::find($user->plan_id);
+                $plan = Plan::find($user->plan_id);
+            } else {
+                $plan = $user->plan;
             }
 
-            if (!$user->plan || $user->plan->transfer_enable === null) {
+            if (!$plan || $plan->transfer_enable === null) {
                 continue;
             }
 
             $user->update([
                 'u' => 0,
                 'd' => 0,
-                'transfer_enable' => $user->plan->transfer_enable * 1024 * 1024 * 1024,
+                'transfer_enable' => $plan->transfer_enable * 1024 * 1024 * 1024,
             ]);
         }
     }
