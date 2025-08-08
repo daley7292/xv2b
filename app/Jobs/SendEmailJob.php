@@ -17,8 +17,8 @@ class SendEmailJob implements ShouldQueue
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
     protected $params;
-    public $tries = 3;
-    public $timeout = 10;
+    public $tries = 5;
+    public $timeout = 30;
     protected $rateLimits = [
         'send_email' => [
             'per_minute' => 60,
